@@ -130,6 +130,7 @@ else:
         }
     }
 
+# django superuser: myz, myzno1best
 
 # Sqlite database
 # DATABASES = {
