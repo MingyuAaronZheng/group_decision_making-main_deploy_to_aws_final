@@ -27,18 +27,31 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
     '172.31.12.2',
+    '18.224.191.19',
     '18.235.57.99',
     '34.233.106.112',
     '172.31.25.73',
     '54.209.49.172',
     '172.31.89.157',
+    '172.31.30.177',
+    '3.147.145.221',
+    '172.31.30.177',
+    '3.17.190.105',
+    '3.139.17.176',
+    '.elasticbeanstalk.com',
+    'awseb--awseb-ejxocicmmv6g-417971530.us-east-2.elb.amazonaws.com',
+    'ec2-3-139-17-176.us-east-2.compute.amazonaws.com',
     'crowd.cs.purdue.edu',
     'yuchun.org',
     'www.yuchun.org',
     'devil-dev.us-east-1.elasticbeanstalk.com',
     '172.31.6.115',
     'devil-advocate.hci-study.com',
-    'www.devil-advocate.hci-study.com'
+    'www.devil-advocate.hci-study.com',
+    'pilotexperimentmytest.us-east-2.elasticbeanstalk.com',
+    'main.dc7qzmkgzroc5.amplifyapp.com',
+    'go.discussionexperiment.com',
+    os.environ.get('EB_PUBLIC_HOSTNAME', ''),
 ]
 
 
@@ -71,8 +84,43 @@ MIDDLEWARE = [
 
 CORS_ORIGIN_WHITELIST = [
     'http://127.0.0.1:8080',
-    'https://127.0.0.1:8080'
+    'https://127.0.0.1:8080',
+    'https://main.dc7qzmkgzroc5.amplifyapp.com',
+    'https://pilotexperimentmytest.us-east-2.elasticbeanstalk.com',
+    'https://go.discussionexperiment.com'
 ]
+CORS_ALLOWED_ORIGINS = [
+    "https://main.dc7qzmkgzroc5.amplifyapp.com",
+    "https://pilotexperimentmytest.us-east-2.elasticbeanstalk.com",
+    "https://go.discussionexperiment.com"
+]
+
+# Allow credentials (optional, only if needed)
+# CORS_ALLOW_CREDENTIALS = True
+
+# Allow all origins (for debugging only, DO NOT use in production)
+# CORS_ALLOW_ALL_ORIGINS = True
+
+# Allowed HTTP methods
+CORS_ALLOW_METHODS = [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS"
+]
+
+# Allowed Headers
+CORS_ALLOW_HEADERS = [
+    "authorization",
+    "content-type",
+    "accept",
+    "origin",
+    "user-agent",
+    "x-csrftoken"
+]
+
 
 ROOT_URLCONF = 'server.urls'
 
@@ -110,7 +158,7 @@ CHANNEL_LAYERS = {
 if 'RDS_DB_NAME' in os.environ:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'ENGINE': 'django.db.backends.postgresql',
             'NAME': os.environ['RDS_DB_NAME'],
             'USER': os.environ['RDS_USERNAME'],
             'PASSWORD': os.environ['RDS_PASSWORD'],
@@ -121,16 +169,15 @@ if 'RDS_DB_NAME' in os.environ:
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': 'pilot_test_po_distribution',
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'experimentai',
             'USER': 'myz',
-            'PASSWORD': 'myzbest',
+            'PASSWORD': 'myzisbestno1',
             'HOST': 'localhost',
             'PORT': '5432',
         }
     }
 
-# django superuser: myz, myzno1best
 
 # Sqlite database
 # DATABASES = {
@@ -183,3 +230,28 @@ STATIC_URL = '/static/'
 
 # Test Mode
 TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'experiment': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
