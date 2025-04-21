@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import JSONField
+from datetime import datetime
 
 class Subject(models.Model):
 	_id = models.AutoField(auto_created = True, primary_key=True)
@@ -12,6 +13,7 @@ class Subject(models.Model):
 	active = models.BooleanField(default=True)  # Track if user is currently active
 	confirmed_instructions = models.BooleanField(default=False)  # Track if third person has confirmed instructions
 	random_third_person_prompt = models.IntegerField(default=-1)  # Track if third person has confirmed instructions
+	ready_to_pair = models.BooleanField(default=False)  # Track if subject is ready to be paired
 	
 	# Time stamps
 	start_time = models.DateTimeField(default = None, blank=True, null = True)
@@ -38,9 +40,10 @@ class Subject(models.Model):
 	is_complete = models.BooleanField(default=False)
 	is_paid = models.BooleanField(default=False)
 	is_interest = models.BooleanField(default=False)
-	avatar_name = models.CharField(max_length=60, default = None, null = True)
-	avatar_color = models.CharField(max_length=60, default = None, null = True)
-	# individual_responses = JSONField(default=list)
+	avatar_name = models.CharField(max_length=60, null=True, blank=True, default="")
+	avatar_color = models.CharField(max_length=60, null=True, blank=True, default="")
+
+	
 
 	def __str__(self):
 		return str(self._id)
@@ -56,22 +59,50 @@ class Group(models.Model):
 	is_activated = models.BooleanField(default = True)
 	has_capacity = models.BooleanField(default = True)
 	third_person_id = models.IntegerField(default = -1)  # Track who is the third person
+	'''
+	== participant_condition Setting ==
+	0: 2 Human Participants
+	1: 2 Human Participants + ADVOCATING AI Participant
+	2: 2 Human Participants + DISPUTING AI Participant
+	3: 2+1 Human Participants
+	'''
 	group_participant_condition = models.IntegerField(default = -1)
+	'''
+	== moderator_condition Setting == 
+	0: No AI Moderator
+	1: AI Moderator
+	'''
 	group_moderator_condition = models.IntegerField(default = -1)
 	group_chat_statement_index = models.IntegerField(default = -1)
 	member_ids = JSONField(default = memeber_default)
 	activate_member_ids = JSONField(default = memeber_default)
 	chatting = models.BooleanField(default=False)  # New field to track active chat status
-	current_turn = models.IntegerField(default=0)  # Track current turn number
-	turn_messages = JSONField(default=dict)  # Track who has sent messages in current turn
+	current_turn = models.IntegerField(default=1)  # Track current turn number
+	messages_turn = JSONField(default=dict)  # Track who has sent messages in current turn
 	# Format: {turn_number: [subject_ids_who_sent_messages]}
 	chat_started = models.BooleanField(default=False)  # Track if welcome message has been sent
 	group_member_agreement_levels = JSONField(default=dict)  # Track member agreement levels
 	# Format: {subject_id: agreement_level}
+	assigned_avatars = JSONField(default=list)  # Track assigned avatars for the group
 
 	def __str__(self):
 		return str(self._id)
 
+class TimeRecord(models.Model):
+	_id = models.AutoField(auto_created = True, primary_key = True)
+	subject_id = models.IntegerField(default = None, null = True)
+	# * Button click Time
+	StarEntrance_button_time = models.DateTimeField(default = None)
+	DemograSurvey_button_time = models.DateTimeField(default=None, null=True)
+	PreDSurvey_button_time = models.DateTimeField(default = None, null=True)
+	pair_start_time = models.DateTimeField(default = None, null=True)
+	# ! pair_end_time is also the time that the user enters the discussion instruction page
+	pair_end_time = models.DateTimeField(default = None, null=True)
+	confirm_instructions_time = models.DateTimeField(default = None, null=True)
+	start_chat_time = models.DateTimeField(default = None, null=True)
+	end_chat_time = models.DateTimeField(default = None, null=True)
+	PostDOSurvey_button_time = models.DateTimeField(default = None, null=True)
+	PostDFSurvey_button_time = models.DateTimeField(default = None, null=True)
 
 class MessageRecord(models.Model):
 	_id = models.AutoField(auto_created = True, primary_key = True)
@@ -79,6 +110,9 @@ class MessageRecord(models.Model):
 	group_id = models.IntegerField(default = None, null = True)
 	message = models.CharField(max_length= 2048, null = True)
 	time_stamp = models.DateTimeField(auto_now_add=True, blank=True)
+	turn_number = models.IntegerField(default = 1)
+	# The auto_now_add parameter automatically sets the DateTimeField to the current date and time when the object is created. 
+	# The blank parameter allows the field to be blank in the admin interface.
 
 	def __str__(self):
 		return str(self._id)
@@ -112,27 +146,6 @@ class PreDSurvey(models.Model):
 	_id = models.AutoField(auto_created=True, primary_key=True)
 	subject_id = models.IntegerField(default = None)
 	responses = JSONField(default=list)
-
-	def __str__(self):
-		return str(self._id)
-
-class PostSurvey(models.Model):
-	_id = models.AutoField(auto_created=True, primary_key=True)
-	subject_id = models.IntegerField(default = None)
-	mental_demand = models.CharField(max_length=1)
-	physical_demand = models.CharField(max_length=1)
-	temporal_demand = models.CharField(max_length=1)
-	performance = models.CharField(max_length=1)
-	effort = models.CharField(max_length=1)
-	frustration = models.CharField(max_length=1)
-	timeline = models.CharField(max_length=1)
-	precision = models.CharField(max_length=1)
-	usefulness = models.CharField(max_length=1)
-	da_collaboration = models.CharField(max_length=1)
-	da_satisfaction = models.CharField(max_length=1)
-	da_quality = models.CharField(max_length=1)
-	da_recommend = models.CharField(max_length=1)
-	da_future = models.CharField(max_length=1)
 
 	def __str__(self):
 		return str(self._id)
@@ -182,7 +195,7 @@ class PostDFSurvey(models.Model):
     critical_thinking_responses = JSONField(default=list)  # Array of 1-7 responses
     
     # AI Tool Usage
-    used_ai_tool = models.BooleanField()
+    used_ai_tool = models.IntegerField(default=None)
     
     # AI Interaction Quality
     ai_participant_responses = JSONField(default=list, null=True)  # Array of 1-7 responses
@@ -195,3 +208,19 @@ class PostDFSurvey(models.Model):
 
     def __str__(self):
         return f"PostDFSurvey {self._id} - Subject {self.subject_id}"
+
+class GPTIntermediate(models.Model):
+    _id = models.AutoField(auto_created=True, primary_key=True)
+    group_id = models.IntegerField(default=None)
+    gpt_id = models.IntegerField(default=0, null=True)
+    turn_number = models.IntegerField(default = 1)
+    initial_response_text = models.CharField(max_length= 2048, null = True)
+    processed_sub_sentences = JSONField(default=list)
+    valid_sub_sentences = JSONField(default=list)
+    final_response = models.CharField(max_length= 2048, null = True)
+    initial_response_time = models.FloatField(null = True)
+    validation_time = models.FloatField(null = True)
+    merge_time = models.FloatField(null = True)
+    record_time = models.DateTimeField(default=datetime.now, null=True)
+    def __str__(self):
+        return str(self._id)

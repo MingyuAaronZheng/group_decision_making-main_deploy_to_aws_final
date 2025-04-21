@@ -23,12 +23,19 @@ from django.conf import settings
 urlpatterns = [
     path('', views.home_view),
     path('ccw/admin/', admin.site.urls),
-    
+
     # Include all experiment URLs
     path('ccw/api/', include('experiment.urls')),
-    
+
     # Legacy URLs that haven't been moved yet
     path('ccw/api/create_subject', views.create_subject),
     path('ccw/api/update_demogra_survey', views.updateDemograSurvey),
-    path('ccw/api/Update_pre_discussion_survey', views.Update_pre_discussion_survey)
+    path('ccw/api/get_subject_info', views.get_subject_info),
+    path('ccw/api/Update_pre_discussion_survey', views.Update_pre_discussion_survey),
+    path('ccw/api/update_chat_status', views.update_chat_status),
+    path('ccw/api/post_do_survey', views.post_do_survey),
+    path('ccw/api/post_df_survey', views.post_df_survey),
+    path('ccw/api/get_group_current_turn', views.get_group_current_turn),
+    path('ccw/api/get_group_member_agreements', views.get_group_member_agreements),
+
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
