@@ -79,7 +79,9 @@ MIDDLEWARE = [
 
 CORS_ORIGIN_WHITELIST = [
     'http://127.0.0.1:8080',
-    'https://127.0.0.1:8080'
+    'https://127.0.0.1:8080',
+    'https://main.d93mhbbvrb5dl.amplifyapp.com',
+    'https://main.d3lbr0m46vlu6t.amplifyapp.com'
 ]
 
 ROOT_URLCONF = 'server.urls'
