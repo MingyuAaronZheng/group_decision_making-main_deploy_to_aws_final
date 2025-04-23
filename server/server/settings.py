@@ -42,7 +42,11 @@ ALLOWED_HOSTS = [
     'http://group-discussion-experiment.us-east-2.elasticbeanstalk.com',
     'www.group-discussion-experiment.us-east-2.elasticbeanstalk.com',
     'gobackend.discussionexperiment.com',
-    'www.gobackend.discussionexperiment.com'
+    'www.gobackend.discussionexperiment.com',
+    'https://main.d3lbr0m46vlu6t.amplifyapp.com',
+    'www.main.d3lbr0m46vlu6t.amplifyapp.com',
+    'https://main.d93mhbbvrb5dl.amplifyapp.com',
+    'www.main.d93mhbbvrb5dl.amplifyapp.com'
 ]
 
 
@@ -114,19 +118,12 @@ else:
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
                 # "hosts": [('aws-my-1p3rgt1ppy60m.meelff.0001.use1.cache.amazonaws.com', 6379)],
-            "hosts": [('localhost', 6379)],
-        },
+                "hosts": [('localhost', 6379)],
+            },
+        }
     }
-}
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [(os.environ["REDIS_URL"], 6379)],
-        },
-    },
-}
+
 
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
