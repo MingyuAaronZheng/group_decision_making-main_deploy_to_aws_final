@@ -38,7 +38,11 @@ ALLOWED_HOSTS = [
     'devil-dev.us-east-1.elasticbeanstalk.com',
     '172.31.6.115',
     'devil-advocate.hci-study.com',
-    'www.devil-advocate.hci-study.com'
+    'www.devil-advocate.hci-study.com',
+    'http://group-discussion-experiment.us-east-2.elasticbeanstalk.com',
+    'www.group-discussion-experiment.us-east-2.elasticbeanstalk.com',
+    'gobackend.discussionexperiment.com',
+    'www.gobackend.discussionexperiment.com'
 ]
 
 
@@ -95,14 +99,33 @@ TEMPLATES = [
 WSGI_APPLICATION = 'server.wsgi.application'
 ASGI_APPLICATION = 'server.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default' : {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            # "hosts": [('aws-my-1p3rgt1ppy60m.meelff.0001.use1.cache.amazonaws.com', 6379)],
+if 'REDIS_URL' in os.environ:
+    CHANNEL_LAYERS = {
+        'default' : {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [(os.environ["REDIS_URL"], 6379)],
+            },
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default' : {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                # "hosts": [('aws-my-1p3rgt1ppy60m.meelff.0001.use1.cache.amazonaws.com', 6379)],
             "hosts": [('localhost', 6379)],
         },
     }
+}
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(os.environ["REDIS_URL"], 6379)],
+        },
+    },
 }
 
 # Database
