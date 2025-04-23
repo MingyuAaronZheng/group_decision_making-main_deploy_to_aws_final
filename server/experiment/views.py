@@ -17,6 +17,13 @@ from datetime import datetime
 from django.views.decorators.csrf import ensure_csrf_cookie
 
 
+SUCCESS_CODE = "CVGW5BEE"
+FAILED_ATTENTION_CODE = "C2ZILU9F"
+GO_BACK_TERMINATE_CODE = "C3AXEIWP"
+INACTIVE_TERMINATE_CODE = "C4ZJ8888"
+FAILED_PAIRING_CODE = "C5ZJ8888"
+
+
 # Initialize logger
 logging.basicConfig(
     level=logging.INFO,
@@ -1244,6 +1251,7 @@ def get_group_member_agreements(request):
         logger.error(f"Error in get_group_member_agreements: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
+@api_view(['POST'])
 def terminate_participation(request):
     subject_id = request.POST.get('subject_id', None)
     if subject_id is None:
@@ -1253,3 +1261,33 @@ def terminate_participation(request):
         return JsonResponse({'success': True})
     except Subject.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Subject not found'}, status=404)
+
+
+@api_view(['POST'])
+def submit_to_prolific(request):
+    json = {}
+    subject_id = request.POST.get('subject_id', None)
+    status = request.POST.get('status', None)
+    if subject_id != None:
+        subject = Subject.objects.get(pk=subject_id)
+        # Map status to Prolific completion codes
+        if status == 'success':
+            code = SUCCESS_CODE
+        elif status == 'failed_attention':
+            code = FAILED_ATTENTION_CODE
+        elif status == 'go_back_terminate':
+            code = GO_BACK_TERMINATE_CODE
+        elif status == 'inactive_terminate':
+            code = INACTIVE_TERMINATE_CODE
+        elif status == 'failed_pairing':
+            code = FAILED_PAIRING_CODE
+        else:
+            code = FAILED_ATTENTION_CODE
+        # Update subject status and timestamps
+        subject.end_time = timezone.now()
+        subject.active = False
+        subject.status = status
+        subject.save()
+        prolific_url = f"https://app.prolific.co/submissions/complete?cc={code}"
+        return JsonResponse({'success': True, 'prolific_url': prolific_url})
+    raise PermissionDenied("Subject id is missing, please contact the requester.")

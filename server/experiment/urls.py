@@ -25,9 +25,11 @@ urlpatterns = [
     path('post_df_survey', views.post_df_survey, name='post_df_survey'),
     path('get_group_member_agreements', views.get_group_member_agreements, name='get_group_member_agreements'),
 
-    # Heartbeat
+    # activity check
     path('heartbeat', views.heartbeat, name='heartbeat'),
+    path('terminate_participation', views.terminate_participation, name='terminate_participation'),
 
     # Debug endpoints
-    path('debug_pre_discussion_surveys', views.debug_pre_discussion_surveys, name='debug_pre_discussion_surveys')
+    path('debug_pre_discussion_surveys', views.debug_pre_discussion_surveys, name='debug_pre_discussion_surveys'),
+    path('submit_to_prolific', views.submit_to_prolific, name='submit_to_prolific')
 ]

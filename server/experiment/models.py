@@ -14,7 +14,7 @@ class Subject(models.Model):
 	confirmed_instructions = models.BooleanField(default=False)  # Track if third person has confirmed instructions
 	random_third_person_prompt = models.IntegerField(default=-1)  # Track if third person has confirmed instructions
 	ready_to_pair = models.BooleanField(default=False)  # Track if subject is ready to be paired
-	
+
 	# Time stamps
 	start_time = models.DateTimeField(default = None, blank=True, null = True)
 	end_time = models.DateTimeField(default = None, blank=True, null = True)
@@ -22,7 +22,7 @@ class Subject(models.Model):
 	pair_end_time = models.DateTimeField(default = None, blank=True, null = True)
 	last_active_time = models.DateTimeField(default = None, blank=True, null = True)
 	'''
-	== moderator_condition Setting == 
+	== moderator_condition Setting ==
 	0: No AI Moderator
 	1: AI Moderator
 	'''
@@ -42,8 +42,8 @@ class Subject(models.Model):
 	is_interest = models.BooleanField(default=False)
 	avatar_name = models.CharField(max_length=60, null=True, blank=True, default="")
 	avatar_color = models.CharField(max_length=60, null=True, blank=True, default="")
+	status = models.CharField(max_length=60, null=True, blank=True, default="in progress")
 
-	
 
 	def __str__(self):
 		return str(self._id)
@@ -68,7 +68,7 @@ class Group(models.Model):
 	'''
 	group_participant_condition = models.IntegerField(default = -1)
 	'''
-	== moderator_condition Setting == 
+	== moderator_condition Setting ==
 	0: No AI Moderator
 	1: AI Moderator
 	'''
@@ -111,7 +111,7 @@ class MessageRecord(models.Model):
 	message = models.CharField(max_length= 2048, null = True)
 	time_stamp = models.DateTimeField(auto_now_add=True, blank=True)
 	turn_number = models.IntegerField(default = 1)
-	# The auto_now_add parameter automatically sets the DateTimeField to the current date and time when the object is created. 
+	# The auto_now_add parameter automatically sets the DateTimeField to the current date and time when the object is created.
 	# The blank parameter allows the field to be blank in the admin interface.
 
 	def __str__(self):
@@ -153,7 +153,7 @@ class PreDSurvey(models.Model):
 class PostDOSurvey(models.Model):
     _id = models.AutoField(auto_created=True, primary_key=True)
     subject_id = models.IntegerField(default=None)
-    
+
     # Policy Attitudes and Personal Importance
     policy_responses = JSONField(default=list)
     # Format: [
@@ -164,17 +164,17 @@ class PostDOSurvey(models.Model):
     #   },
     #   ...
     # ]
-    
+
     # Conversation Quality
     conversation_quality = models.IntegerField(null=True)  # 1-7
     conversation_responses = JSONField(default=list)  # Array of 1-7 responses
-    
+
     # Democratic Reciprocity
     reciprocity_responses = JSONField(default=list)  # Array of 1-7 responses
-    
+
     # Reflection
     reflection = models.TextField(null=True, blank=True)
-    
+
     time_stamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -183,27 +183,27 @@ class PostDOSurvey(models.Model):
 class PostDFSurvey(models.Model):
     _id = models.AutoField(auto_created=True, primary_key=True)
     subject_id = models.IntegerField(default=None)
-    
+
     # Reflection
     reflection = models.TextField()
-    
+
     # Attention Checks
     attention_check_1 = models.CharField(max_length=10)  # Answer to 35 + 47
     attention_check_2 = models.IntegerField()  # Should be 7 (Strongly Agree)
-    
+
     # Critical Thinking
     critical_thinking_responses = JSONField(default=list)  # Array of 1-7 responses
-    
+
     # AI Tool Usage
     used_ai_tool = models.IntegerField(default=None)
-    
+
     # AI Interaction Quality
     ai_participant_responses = JSONField(default=list, null=True)  # Array of 1-7 responses
     ai_moderator_responses = JSONField(default=list, null=True)  # Array of 1-7 responses
-    
+
     # Cost of Communication
     cost_responses = JSONField(default=list)  # Array of 1-7 responses
-    
+
     time_stamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

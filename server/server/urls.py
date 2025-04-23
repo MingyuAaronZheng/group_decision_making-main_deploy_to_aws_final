@@ -37,5 +37,7 @@ urlpatterns = [
     path('ccw/api/post_df_survey', views.post_df_survey),
     path('ccw/api/get_group_current_turn', views.get_group_current_turn),
     path('ccw/api/get_group_member_agreements', views.get_group_member_agreements),
+    path('ccw/api/terminate_participation', views.terminate_participation),
+    path('ccw/api/submit_to_prolific', views.submit_to_prolific)
 
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
