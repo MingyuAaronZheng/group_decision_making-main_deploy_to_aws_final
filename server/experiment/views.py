@@ -233,105 +233,13 @@ def remove_inactive_users_from_groups(inactive_users):
 
 @api_view(['POST'])
 def pairing(request):
-    subject_id = request.POST.get('subject_id', None)
-    if subject_id is None:
-        logger.info('Error: Missing subject_id')
-        return JsonResponse({'success': False, 'message': 'Missing subject_id', 'has_capacity': False}, status=400)
-
-    subject = Subject.objects.get(pk=subject_id)
-    if subject.test == 'N':
-        return pairing_real(subject_id)
-    else:
-        return pairing_test(subject_id)
-
-def pairing_test(subject_id):
-    """!! TEST EXPERIMENT: Pairs users into groups with different opinions on at least one shared statement."""
-    subject = Subject.objects.get(pk=subject_id)
-    if subject.group_id != -1:
-        group = Group.objects.get(pk=subject.group_id)
-        group.refresh_from_db()
-        return JsonResponse({
-            'success': True,
-            'group_id': group._id,
-            'group_capacity': group.size,
-            'moderator_condition': group.group_moderator_condition,
-            'participant_condition': group.group_participant_condition,
-            'chat_statement_indx': group.group_chat_statement_index,
-            'assigned_avatars': group.assigned_avatars,  # Assign avatar to subject
-            'is_third_person': False,
-            'average_waiting_time': get_average_waiting_time(),
-            'has_capacity': group.has_capacity
-        })
-
-    # **Step 2: Find potential partners matching test variables and opposing opinions**
-    potential_partners = []
-    for partner in Subject.objects.filter(
-        group_id=-1,
-        ready_to_pair=True,
-        test_moderator_code=subject.test_moderator_code,
-        test_participant_code=subject.test_participant_code
-    ).exclude(_id=subject._id):
-        different_idx = get_different_opinions(subject, partner)
-        if different_idx is not None and subject.test_policy_number in different_idx:
-            potential_partners.append(partner)
-
-    if not potential_partners:
-        return JsonResponse({
-            'success': False,
-            'message': 'No suitable partner found',
-            'average_waiting_time': get_average_waiting_time()
-        })
-
-    partner = random.choice(potential_partners)
-    chat_statement_idx = subject.test_policy_number
-    moderator_condition = subject.test_moderator_code
-    participant_condition = subject.test_participant_code
-
-    # **Step 3: Create a New Test Group**
-    with transaction.atomic():
-        group = Group.objects.create(
-            size=3 if participant_condition != 0 else 2,
-            group_chat_statement_index=chat_statement_idx,
-            group_moderator_condition=moderator_condition,
-            group_participant_condition=participant_condition,
-            current_size=2,
-            current_turn=subject.test_turn_number
-        )
-        group.member_ids['subject_ids'] = [subject._id, partner._id]
-        group.has_capacity = (participant_condition == 3)
-        # Assign avatars if group is full
-        assigned_avatars = None
-        if not group.has_capacity:
-            assigned_avatars = assign_avatars_to_group(group)
-            group.assigned_avatars = assigned_avatars
-        group.save()
-
-        # Update subject assignments
-        subject.group_id = group._id
-        partner.group_id = group._id
-        subject.save(update_fields=['group_id'])
-        partner.save(update_fields=['group_id'])
-        group.refresh_from_db()
-
-    # **Step 4: Return Response**
-    response = {
-        'success': True,
-        'group_id': group._id,
-        'group_capacity': group.size,
-        'moderator_condition': group.group_moderator_condition,
-        'participant_condition': group.group_participant_condition,
-        'chat_statement_indx': group.group_chat_statement_index,
-        'assigned_avatars': assigned_avatars,
-        'average_waiting_time': get_average_waiting_time(),
-        'is_third_person': False,
-        'has_capacity': group.has_capacity
-    }
-    return JsonResponse(response)
-
-def pairing_real(subject_id):
-    """!! REAL EXPERIMENT: Pairs users into groups with different opinions on at least one shared statement."""
+    """Pairs users into groups with different opinions on at least one shared statement."""
 
     try:
+        subject_id = request.POST.get('subject_id', None)
+        if subject_id is None:
+            logger.info('Error: Missing subject_id')
+            return JsonResponse({'success': False, 'message': 'Missing subject_id', 'has_capacity': False}, status=400)
 
         subject = Subject.objects.get(pk=subject_id)
         if subject.group_id != -1:
@@ -413,12 +321,21 @@ def pairing_real(subject_id):
         chat_statement_idx = random.choices(available_statements, weights=weights)[0]
 
         # Assign `moderator_condition`
-        # moderator_condition = random.choice([0, 1])  # 50% chance for AI Moderator
-        moderator_condition = random.choice([0])  # A Moderator for TEST
+        # REAL: 50% chance for AI Moderator
+        if subject.test == 'N':
+            moderator_condition = random.choice([0, 1])
+        else:
+            # TEST: Use fixed moderator code
+            moderator_condition = subject.test_moderator_code
+            print('Test moderator code: ', moderator_condition)
         # Assign `participant_condition` with equal probability
-        # participant_condition = random.choice([0, 1, 2, 3])
-        participant_condition = random.choice([1]) # Only 3-person group with AI Participant for TEST
-
+        # REAL: 2 human; 1 human + 1 Advocate AI; 1 human + 1 Dispute AI; 3 human
+        if subject.test == 'N':
+            participant_condition = random.choice([0, 1, 2, 3])
+        else:
+            # TEST: Use fixed participant code
+            participant_condition = subject.test_participant_code
+            print('Test participant code: ', participant_condition)
         # **Step 4: Create a New Group**
         with transaction.atomic():
             group = Group.objects.create(
@@ -429,6 +346,7 @@ def pairing_real(subject_id):
                 current_size=0,
                 current_turn=1
             )
+            print('Group created with moderator condition: ', moderator_condition, ' and participant condition: ', participant_condition, ' and chat statement index: ', chat_statement_idx)
 
             # Assign both users to the group
             group.member_ids['subject_ids'] = [subject._id, random_match_partner._id]
@@ -590,8 +508,7 @@ def get_statement_frequencies():
     min_count = min(count_dict.values())
     max_count = max(count_dict.values())
     if min_count < 10 and max_count <= 10:
-        # threshold = 10
-        threshold = 10000 # a large number for TEST
+        threshold = 10
     elif min_count >= 10 and min_count < 20 and max_count <= 20:  # Only increase threshold if all counts >= 10
         threshold = 20
     elif min_count >= 20 and min_count < 30 and max_count <= 30:  # Only increase threshold if all counts >= 20
