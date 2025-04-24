@@ -1111,9 +1111,9 @@ def Update_pre_discussion_survey(request):
     if subject_id is not None:
         try:
             # Create survey record
-            survey = PreDSurvey.objects.create(
+            survey, created = PreDSurvey.objects.update_or_create(
                 subject_id=subject_id,
-                responses=responses
+                defaults={'responses': responses}
             )
 
             time_record = TimeRecord.objects.get(subject_id=subject_id)
