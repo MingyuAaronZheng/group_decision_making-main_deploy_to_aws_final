@@ -15,7 +15,7 @@ from django.db import connection, transaction
 import logging
 from datetime import datetime
 from django.views.decorators.csrf import ensure_csrf_cookie
-
+import time
 
 SUCCESS_CODE = "CVGW5BEE"
 FAILED_ATTENTION_CODE = "C2ZILU9F"
