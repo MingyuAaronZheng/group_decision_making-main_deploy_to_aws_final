@@ -244,7 +244,6 @@ def pairing(request):
     else:
         return pairing_test(subject_id)
 
-
 def pairing_test(subject_id):
     """!! TEST EXPERIMENT: Pairs users into groups with different opinions on at least one shared statement."""
     subject = Subject.objects.get(pk=subject_id)
