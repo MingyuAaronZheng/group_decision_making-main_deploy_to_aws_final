@@ -44,7 +44,12 @@ class Subject(models.Model):
 	avatar_color = models.CharField(max_length=60, null=True, blank=True, default="")
 	status = models.CharField(max_length=60, null=True, blank=True, default="in progress")
 
-
+	# Test variables
+	test_policy_number = models.IntegerField(default = -1)
+	test_turn_number = models.IntegerField(default = -1)
+	test_moderator_code = models.IntegerField(default = -1)
+	test_participant_code = models.IntegerField(default = -1)
+	test = models.CharField(max_length=1, default='N', null=True, blank=True)
 	def __str__(self):
 		return str(self._id)
 
@@ -84,6 +89,8 @@ class Group(models.Model):
 	group_member_agreement_levels = JSONField(default=dict)  # Track member agreement levels
 	# Format: {subject_id: agreement_level}
 	assigned_avatars = JSONField(default=list)  # Track assigned avatars for the group
+
+
 
 	def __str__(self):
 		return str(self._id)
@@ -146,6 +153,7 @@ class PreDSurvey(models.Model):
 	_id = models.AutoField(auto_created=True, primary_key=True)
 	subject_id = models.IntegerField(default = None)
 	responses = JSONField(default=list)
+	suggestions = models.TextField(default = '')
 
 	def __str__(self):
 		return str(self._id)

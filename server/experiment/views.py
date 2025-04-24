@@ -59,18 +59,36 @@ def create_subject(request):
     worker_id = request.POST.get('worker_id', None)
     study_id = request.POST.get('study_id', None)
     session_id = request.POST.get('session_id', None)
+    test = request.POST.get('test', None)
+    if test == 'Y':
+        test_moderator_code = request.POST.get('test_moderator_code', None)
+        test_participant_code = request.POST.get('test_participant_code', None)
+        test_policy_number = request.POST.get('test_policy_number', None)
+        test_turn_number = request.POST.get('test_turn_number', None)
 
     if worker_id is not None:
         if not Subject.objects.filter(worker_id=worker_id).exists():
             # Normal subject creation
             # participant_number_condition = random.choices([0, 1], weights=[3, 1])[0]
             # selected_indices = sample(range(12), 6)
-
-            sub = Subject.objects.create(
-                worker_id=worker_id,
-                study_id=study_id,
-                session_id=session_id
-            )
+            if test == 'Y':
+                sub = Subject.objects.create(
+                    worker_id=worker_id,
+                    study_id=study_id,
+                    session_id=session_id,
+                    test=test,
+                    test_moderator_code=test_moderator_code,
+                    test_participant_code=test_participant_code,
+                    test_policy_number=test_policy_number,
+                    test_turn_number=test_turn_number
+                )
+            else:
+                sub = Subject.objects.create(
+                    worker_id=worker_id,
+                    study_id=study_id,
+                    session_id=session_id,
+                    test=test
+                )
             time_record = TimeRecord.objects.create(
                 subject_id=sub._id,
                 StarEntrance_button_time=timezone.now()
@@ -1125,6 +1143,7 @@ def Update_pre_discussion_survey(request):
     response_data = {}
     data = request.data
     subject_id = data.get('subject_id', None)
+    suggestions = data.get('suggestions', '')
     responses = data.get('responses', [])
 
     if subject_id is not None:
@@ -1132,7 +1151,8 @@ def Update_pre_discussion_survey(request):
             # Create survey record
             survey, created = PreDSurvey.objects.update_or_create(
                 subject_id=subject_id,
-                defaults={'responses': responses}
+                defaults={'responses': responses, 'suggestions': suggestions},
+
             )
 
             time_record = TimeRecord.objects.get(subject_id=subject_id)
