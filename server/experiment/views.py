@@ -320,7 +320,8 @@ def pairing(request):
                 group_chat_statement_index=chat_statement_idx,
                 group_moderator_condition=moderator_condition,
                 group_participant_condition=participant_condition,
-                current_size=0
+                current_size=0,
+                current_turn=1
             )
 
             # Assign both users to the group
