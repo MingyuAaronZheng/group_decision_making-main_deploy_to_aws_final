@@ -1,4 +1,4 @@
-# myproject/redis_layer.py
+# server/redis_layer.py
 
 from channels_redis.core import RedisChannelLayer
 
