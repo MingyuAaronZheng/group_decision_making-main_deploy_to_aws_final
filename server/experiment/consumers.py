@@ -13,7 +13,8 @@ class ChatConsumer(WebsocketConsumer):
     def connect(self):
         self.room_name = self.scope['url_route']['kwargs']['room_name']
         # Add 'chat_' prefix to match the group_send in views.py
-        self.chat_group_name = f"chat:{{{self.room_name}}}"
+        self.chat_group_name = f"chat_{self.room_name}"
+
 
         # Initialize channel_map as a class variable if it doesn't exist
         if not hasattr(ChatConsumer, 'channel_map'):

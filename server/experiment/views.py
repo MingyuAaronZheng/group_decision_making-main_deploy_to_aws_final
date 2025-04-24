@@ -740,7 +740,7 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
             # Send typing notification: AI Participant started typing
             participant_id = -3 if group.group_participant_condition == 1 else -4
             async_to_sync(channel_layer.group_send)(
-                f"chat:{{{group_id}}}",
+                f"chat_{group_id}",
                 {
                     'type': 'chat_message',
                     'message': {
@@ -781,7 +781,7 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
 
                 print("broadcasting participant response")
                 async_to_sync(channel_layer.group_send)(
-                    f"chat:{{{group_id}}}",
+                    f"chat_{group_id}",
                     {
                         'type': 'chat_message',
                         'message': {
@@ -800,7 +800,7 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
                 time.sleep(1.5)
 
                 async_to_sync(channel_layer.group_send)(
-                    f"chat:{{{group_id}}}",
+                    f"chat_{group_id}",
                     {
                         'type': 'chat_message',
                         'message': {
@@ -824,7 +824,7 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
             logger.info("Getting moderator response")
             # Send typing notification: AI Moderator started typing
             async_to_sync(channel_layer.group_send)(
-                f"chat:{{{group_id}}}",
+                f"chat_{group_id}",
                 {
                     'type': 'chat_message',
                     'message': {
@@ -863,7 +863,7 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
                 logger.info("broadcasting moderator response %s", moderator_response_response)
                 # Broadcast moderator response second
                 async_to_sync(channel_layer.group_send)(
-                    f"chat:{{{group_id}}}",
+                    f"chat_{group_id}",
                     {
                         'type': 'chat_message',
                         'message': {
@@ -883,7 +883,7 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
 
                 # Send typing notification: AI Moderator stopped typing
                 async_to_sync(channel_layer.group_send)(
-                    f"chat:{{{group_id}}}",
+                    f"chat_{group_id}",
                     {
                         'type': 'chat_message',
                         'message': {
