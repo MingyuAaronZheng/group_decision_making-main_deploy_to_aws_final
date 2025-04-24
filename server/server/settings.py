@@ -49,7 +49,7 @@ ALLOWED_HOSTS = [
     'www.main.d93mhbbvrb5dl.amplifyapp.com',
     '172.31.16.110',
     '3.13.219.153',
-    '3.13.219.153'
+    '3.130.150.227'
 ]
 
 

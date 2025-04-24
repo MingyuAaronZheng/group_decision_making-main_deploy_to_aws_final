@@ -231,19 +231,106 @@ def remove_inactive_users_from_groups(inactive_users):
 
     return users_to_repair  # Return list of active users to be re-paired
 
-
-
-
-
 @api_view(['POST'])
 def pairing(request):
-    """Pairs users into groups with different opinions on at least one shared statement."""
     subject_id = request.POST.get('subject_id', None)
-
-
     if subject_id is None:
         logger.info('Error: Missing subject_id')
         return JsonResponse({'success': False, 'message': 'Missing subject_id', 'has_capacity': False}, status=400)
+
+    subject = Subject.objects.get(pk=subject_id)
+    if subject.test == 'N':
+        return pairing_real(subject_id)
+    else:
+        return pairing_test(subject_id)
+
+
+def pairing_test(subject_id):
+    """!! TEST EXPERIMENT: Pairs users into groups with different opinions on at least one shared statement."""
+    subject = Subject.objects.get(pk=subject_id)
+    if subject.group_id != -1:
+        group = Group.objects.get(pk=subject.group_id)
+        group.refresh_from_db()
+        return JsonResponse({
+            'success': True,
+            'group_id': group._id,
+            'group_capacity': group.size,
+            'moderator_condition': group.group_moderator_condition,
+            'participant_condition': group.group_participant_condition,
+            'chat_statement_indx': group.group_chat_statement_index,
+            'assigned_avatars': group.assigned_avatars,  # Assign avatar to subject
+            'is_third_person': False,
+            'average_waiting_time': get_average_waiting_time(),
+            'has_capacity': group.has_capacity
+        })
+
+    # **Step 2: Find potential partners matching test variables and opposing opinions**
+    potential_partners = []
+    for partner in Subject.objects.filter(
+        group_id=-1,
+        ready_to_pair=True,
+        test_moderator_code=subject.test_moderator_code,
+        test_participant_code=subject.test_participant_code
+    ).exclude(_id=subject._id):
+        different_idx = get_different_opinions(subject, partner)
+        if different_idx is not None and subject.test_policy_number in different_idx:
+            potential_partners.append(partner)
+
+    if not potential_partners:
+        return JsonResponse({
+            'success': False,
+            'message': 'No suitable partner found',
+            'average_waiting_time': get_average_waiting_time()
+        })
+
+    partner = random.choice(potential_partners)
+    chat_statement_idx = subject.test_policy_number
+    moderator_condition = subject.test_moderator_code
+    participant_condition = subject.test_participant_code
+
+    # **Step 3: Create a New Test Group**
+    with transaction.atomic():
+        group = Group.objects.create(
+            size=3 if participant_condition != 0 else 2,
+            group_chat_statement_index=chat_statement_idx,
+            group_moderator_condition=moderator_condition,
+            group_participant_condition=participant_condition,
+            current_size=2,
+            current_turn=subject.test_turn_number
+        )
+        group.member_ids['subject_ids'] = [subject._id, partner._id]
+        group.has_capacity = (participant_condition == 3)
+        # Assign avatars if group is full
+        assigned_avatars = None
+        if not group.has_capacity:
+            assigned_avatars = assign_avatars_to_group(group)
+            group.assigned_avatars = assigned_avatars
+        group.save()
+
+        # Update subject assignments
+        subject.group_id = group._id
+        partner.group_id = group._id
+        subject.save(update_fields=['group_id'])
+        partner.save(update_fields=['group_id'])
+        group.refresh_from_db()
+
+    # **Step 4: Return Response**
+    response = {
+        'success': True,
+        'group_id': group._id,
+        'group_capacity': group.size,
+        'moderator_condition': group.group_moderator_condition,
+        'participant_condition': group.group_participant_condition,
+        'chat_statement_indx': group.group_chat_statement_index,
+        'assigned_avatars': assigned_avatars,
+        'average_waiting_time': get_average_waiting_time(),
+        'is_third_person': False,
+        'has_capacity': group.has_capacity
+    }
+    return JsonResponse(response)
+
+def pairing_real(subject_id):
+    """!! REAL EXPERIMENT: Pairs users into groups with different opinions on at least one shared statement."""
 
     try:
 
@@ -811,8 +898,7 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
                 # Broadcast participant AI response first
                 participant_gpt_response_response = json.loads(participant_gpt_response)['response']
                 logger.info("broadcasting participant response %s", participant_gpt_response_response)
-
-                print("broadcasting participant response")
+                # Broadcast participant AI response first
                 async_to_sync(channel_layer.group_send)(
                     f"chat_{group_id}",
                     {
