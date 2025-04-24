@@ -705,6 +705,7 @@ def record_message(request):
         logger.info('Message: %s', message)
         return JsonResponse({'error': str(e)}, status=500)
 
+import time
 def send_turn_end_gpt_response(group_id, current_turn_str):
     logger.info('Starting send_turn_end_gpt_response')
     logger.info('Group ID: %s', group_id)
