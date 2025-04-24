@@ -113,8 +113,10 @@ if 'REDIS_URL' in os.environ:
         'default' : {
             'BACKEND': 'server.redis_layer.TaggedRedisChannelLayer',
             'CONFIG': {
-                "hosts": [os.environ["REDIS_URL"]],
-            },
+                "hosts": [
+                    (os.environ["REDIS_URL"], 6379),
+                ],
+            }
         }
     }
 else:
