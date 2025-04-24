@@ -797,7 +797,8 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
                     }
                 )
                 # Send typing notification: AI Participant stopped typing
-                print("AI Participant stopped typing")
+                time.sleep(1.5)
+
                 async_to_sync(channel_layer.group_send)(
                     f"chat_{group_id}",
                     {
@@ -877,6 +878,9 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
                         }
                     }
                 )
+
+                time.sleep(1.5)
+
                 # Send typing notification: AI Moderator stopped typing
                 async_to_sync(channel_layer.group_send)(
                     f"chat_{group_id}",
