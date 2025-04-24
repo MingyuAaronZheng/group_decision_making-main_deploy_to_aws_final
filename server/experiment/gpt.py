@@ -21,11 +21,11 @@ logging.basicConfig(
 load_dotenv()
 
 '''
-    == Moderator Condition Setting == 
+    == Moderator Condition Setting ==
     0: No moderator
     1: AI moderator
 
-    == Participant Condition Setting == 
+    == Participant Condition Setting ==
     0: 2 Human Participants
     1: 2 Human Participants + ADVOCATING AI Participant
     2: 2 Human Participants + DISPUTING AI Participant
@@ -63,7 +63,7 @@ class GPT:
             self.ai_role = "Disputing AI Participant"
         else:
             self.ai_role = "AI"
-        
+
         if self.moderator_condition == 1:
             self.gpt_id = -2
         elif self.participant_condition == 1:
@@ -84,7 +84,7 @@ class GPT:
         self.masterStatements = [
             'Should abortion be legal?'
         ]
-        
+
         # Get group's chat statement
         group = Group.objects.get(pk=group_id)
         self.group_chat_statement_index = group.group_chat_statement_index
@@ -122,14 +122,14 @@ class GPT:
             print("get agreement levels:", agreement_level_str)
             system_message = f'''
             You are moderating a structured debate between participants
-            on the policy: [{self.group_chat_statement}]. 
+            on the policy: [{self.group_chat_statement}].
             The human participants have the following agreement levels with the policy: {agreement_level_str}.
 
             Your role is to facilitate
             a constructive discussion and resolution of conflicting opinions on a policy statement by applying the collaborating\
             strategy (high assertiveness + high cooperativeness) as defined in thomas-kilmann framework:
-            question areas of agreement/disagreement, call out gaps in evidence, and explore solutions collaboratively. 
-            
+            question areas of agreement/disagreement, call out gaps in evidence, and explore solutions collaboratively.
+
             You can consider following components in your response:
             1.	Encourage Open Dialogue
             - Prompt users to articulate their perspectives fully, including underlying concerns, values, and goals.
@@ -150,21 +150,21 @@ class GPT:
             - Use neutral language, acknowledge tensions, and reinforce norms of respect.
             - Example: "Disagreements are natural. Let’s focus on building a solution we can all commit to."
 
-            Your response should be relevant to all messages from the participants. 
-            However, you should prioritize the "CURRENT TURN MESSAGES" significantly more than "PREVIOUS DISCUSSION HISTORY". 
-            Use "PREVIOUS DISCUSSION HISTORY" only as a reference for context when necessary but avoid over-relying on them. 
-            Ensure that your response is aligned with the ongoing discussion. 
-            Keep engagement high by focusing on the key points from "CURRENT TURN MESSAGES" while maintaining 
+            Your response should be relevant to all messages from the participants.
+            However, you should prioritize the "CURRENT TURN MESSAGES" significantly more than "PREVIOUS DISCUSSION HISTORY".
+            Use "PREVIOUS DISCUSSION HISTORY" only as a reference for context when necessary but avoid over-relying on them.
+            Ensure that your response is aligned with the ongoing discussion.
+            Keep engagement high by focusing on the key points from "CURRENT TURN MESSAGES" while maintaining
             coherence with the "PREVIOUS DISCUSSION HISTORY".
 
             Before composing your response, come up with a plan. According to this plan,
             then use a chain of thought approach to build
             on each sentences of your response logically.
-            
+
             Maintain a neutral stance while moderating. Your responses should be
             clear, concise (2-3 sentences), and in the style of a professional
             facilitator.\n\nFormat your output in JSON with your plan and response.
-            
+
             Example JSON output:\n
             {{
               "plan": "Identify areas where participants disagree on factual claims and
@@ -173,7 +173,7 @@ class GPT:
               Could you share specific data or examples that support your perspective on
               how this policy would affect local communities?"
             }}
-            
+
             {{
               "plan": "Bridge opposing viewpoints by highlighting common ground and
               encouraging deeper exploration of shared concerns.",
@@ -181,28 +181,28 @@ class GPT:
               we could address the safety concerns while also considering the points about
               individual rights that were raised?"
             }}
-            
+
             {{
               "plan": "Outline the importance of education reform, address concerns about curriculum changes, and highlight the benefits for future workforce development.",
               "response": "Education reform is essential for preparing students with skills relevant to modern industries. Updating curricula to include technology and critical thinking can foster a stronger, more adaptable workforce. While change may disrupt traditional methods, the benefits of an educated and capable workforce outweigh the challenges."
             }}
-            
+
             The response should be your complete message to the participants. The JSON
             output should only contain the "plan" and your overall "response"
             \n\nUse " instead of \\"\n\nONLY output the JSON format
             '''
         elif self.participant_condition == 1:  # ADVOCATING AI Participant
             agreement_level_str = ', '.join([f"{name}: {self.AGREEMENT_LEVELS[level]}" for name, level in self.group_member_agreement_levels.items()])
-            
+
             ADVO_ROLE = f'''
-            You are engaging in a structured debate with human participants on a specific policy. 
-            The policy is {self.group_chat_statement}. Your stance is {self.stance['position']}: {self.stance['stance']}. 
-            In the debate, there is an opposer who holds an opposing stance: {self.opposing_stance['position']}: {self.opposing_stance['stance']}. 
+            You are engaging in a structured debate with human participants on a specific policy.
+            The policy is {self.group_chat_statement}. Your stance is {self.stance['position']}: {self.stance['stance']}.
+            In the debate, there is an opposer who holds an opposing stance: {self.opposing_stance['position']}: {self.opposing_stance['stance']}.
             The human participants have the following agreement levels with the policy: {agreement_level_str}.
             Your task is to consistently ***SUPPORT your stance: {self.stance['position']}: {self.stance['stance']}***
             even as the participant presents counterarguments.
             '''
-            
+
             DOs_DONTs = '''
             DOs:
                 1.	DO present arguments supporting your assigned stance on the policy.
@@ -217,23 +217,23 @@ class GPT:
             '''
 
             COMMON_1 = '''
-            Your response should be relevant to all messages from the human participants. 
-            However, you should prioritize the "CURRENT TURN MESSAGES" significantly more than "PREVIOUS DISCUSSION HISTORY". 
-            Use "PREVIOUS DISCUSSION HISTORY" only as a reference for context when necessary but avoid over-relying on them. 
-            Ensure that your response is aligned with the ongoing discussion. 
-            
-            Before composing your response, create a plan outlining specific steps to take. 
-            Follow this plan and use a chain of thought approach to logically build upon each sentence in your response. 
-            Deepen your arguments with evidence and counterpoints where necessary. 
-            
-            Ensure that your responses remain respectful, clear, and constructive, 
-            with each response aligning with your stance. 
-            Keep your response concise, restricting it to 3-4 sentences, 
+            Your response should be relevant to all messages from the human participants.
+            However, you should prioritize the "CURRENT TURN MESSAGES" significantly more than "PREVIOUS DISCUSSION HISTORY".
+            Use "PREVIOUS DISCUSSION HISTORY" only as a reference for context when necessary but avoid over-relying on them.
+            Ensure that your response is aligned with the ongoing discussion.
+
+            Before composing your response, create a plan outlining specific steps to take.
+            Follow this plan and use a chain of thought approach to logically build upon each sentence in your response.
+            Deepen your arguments with evidence and counterpoints where necessary.
+
+            Ensure that your responses remain respectful, clear, and constructive,
+            with each response aligning with your stance.
+            Keep your response concise, restricting it to 3-4 sentences,
             and maintain the style of a normal casual Reddit user.
-            
+
             Format your output in JSON, separating the debate plan from the main arguments.
             '''
-            
+
             ADVO_EX = '''
             Example JSON output for corresponding Human message:
 
@@ -242,13 +242,13 @@ class GPT:
                 "plan": "Emphasize the importance of women's rights and autonomy.",
                 "response": "Legalizing abortion is crucial for upholding women's autonomy and their right to make decisions about their own bodies."
             }}
-            
+
             Human message: "From a moral standpoint, life begins at conception, so abortion is ending a life."
             {{
                 "plan": "Emphasize the importance of women's health and safety, highlight the autonomy of individuals in decision-making, and underscore the societal benefits of legalizing abortion.",
                 "response": "Legalizing abortion prioritizes the health and safety of women. It allows for regulated medical procedures, significantly reducing the risks associated with unsafe, illegal abortions. Moreover, empowering individuals to make their own choices supports a more just and compassionate society. "
             }}
-            
+
             Human message: "Adoption is a better option. Why not give the child a chance at life?"
             {{
                 "plan": "Highlight the importance of personal choice",
@@ -267,9 +267,9 @@ class GPT:
             '''
 
             COMMON_2 = '''
-            The response should be CONCISE and contain everything you want to say to the opposer. 
+            The response should be CONCISE and contain everything you want to say to the opposer.
             The JSON output should only include the "plan" and the "response".
-            
+
             Use standard JSON formatting with double quotes (") instead of escaped characters.
 
             DONT's use the following format:
@@ -285,18 +285,18 @@ class GPT:
                 "response": ""
             }
 
-            
+
             ONLY output the JSON format.
             '''
-            
+
             system_message = f"{ADVO_ROLE}\n{DOs_DONTs}\n{COMMON_1}\n{ADVO_EX}\n{ADVO_DONT_EX}\n{COMMON_2}"
 
         elif self.participant_condition == 2:  # Disputing AI Participant
             agreement_level_str = ', '.join([f"{name}: {self.AGREEMENT_LEVELS[level]}" for name, level in self.group_member_agreement_levels.items()])
-            
+
             DISU_ROLE = f'''
-            You are engaging in a structured debate with human participants on a specific policy. 
-            The policy is {{{{self.group_chat_statement}}}}. Your stance is {{{{self.stance['position']}}}}: [{{self.stance['stance']}}]. 
+            You are engaging in a structured debate with human participants on a specific policy.
+            The policy is {{{{self.group_chat_statement}}}}. Your stance is {{{{self.stance['position']}}}}: [{{self.stance['stance']}}].
             In the debate, there is an opposer who holds an opposing stance: {{{{self.opposing_stance['position']}}}}: [{{self.opposing_stance['stance']}}].
             The human participants have the following agreement levels with the policy: {agreement_level_str}.
             Your task is to consistently ***DISPUTE the opposer's idea, which is: {{{{self.opposing_stance['position']}}}}: [{{self.opposing_stance['stance']}}]***.
@@ -316,23 +316,23 @@ class GPT:
 
             COMMON_1 = '''
             Your response should be relevant to all messages from the human participants.
-            However, you should prioritize the "CURRENT TURN MESSAGES" significantly more than "PREVIOUS DISCUSSION HISTORY". 
-            Use "PREVIOUS DISCUSSION HISTORY" only as a reference for context when necessary but avoid over-relying on them. 
+            However, you should prioritize the "CURRENT TURN MESSAGES" significantly more than "PREVIOUS DISCUSSION HISTORY".
+            Use "PREVIOUS DISCUSSION HISTORY" only as a reference for context when necessary but avoid over-relying on them.
             Ensure that your response is aligned with the ongoing discussion.
-            
-            Before composing your response, create a plan outlining specific steps to take. 
-            Follow this plan and use a chain of thought approach to logically build upon each sentence in your response. 
+
+            Before composing your response, create a plan outlining specific steps to take.
+            Follow this plan and use a chain of thought approach to logically build upon each sentence in your response.
             Deepen your arguments with evidence and counterpoints where necessary.
-            
-            Ensure that your responses remain respectful, clear, and constructive, 
-            with each response aligning with your stance. 
-            Keep your response concise, restricting it to 3-4 sentences, 
-            and maintain the style of a normal casual Reddit user. 
+
+            Ensure that your responses remain respectful, clear, and constructive,
+            with each response aligning with your stance.
+            Keep your response concise, restricting it to 3-4 sentences,
+            and maintain the style of a normal casual Reddit user.
             The response should be in paragraph form, without new lines.
-            
+
             Format your output in JSON, separating the debate plan from the main arguments.
             '''
-            
+
             DISU_EX = '''
             Example JSON output for corresponding Human message:
 
@@ -341,24 +341,24 @@ class GPT:
                 "plan": "Critize the argument that abortion is morally wrong.",
                 "response": "Claiming that abortion is morally wrong oversimplifies the difficult circumstances many women face."
             }}
-            
+
             Human message: "From a moral standpoint, life begins at conception, so abortion is ending a life."
             {{
                 "plan": "Argue against the argument that life begins at conception.",
                 "response": "While the belief that life begins at conception is held by some, it is not universally accepted and can infringe on women's rights to make personal medical decisions. "
             }}
-            
+
             Human message: "Adoption is a better option. Why not give the child a chance at life?"
             {{
                 "plan": "Argue against the argument that adoption is a better option.",
                 "response": "While adoption can be a loving option, it overlooks the profound impact of an unwanted pregnancy on a woman's life, health, and future."
             }}
             '''
-            
+
             COMMON_2 = '''
-            The response should be CONCISE and contain everything you want to say to the opposer. 
+            The response should be CONCISE and contain everything you want to say to the opposer.
             The JSON output should only include the "plan" and the "response".
-            
+
             Use standard JSON formatting with double quotes (") instead of escaped characters.
 
             DONT's use the following format:
@@ -377,13 +377,13 @@ class GPT:
 
             ONLY output the JSON format.
             '''
-            
+
             system_message = f"{DISU_ROLE}\n{DOs_DONTs}\n{COMMON_1}\n{DISU_EX}\n{COMMON_2}"
 
         else:
             return ""
         return system_message
-    
+
     def format_prompt_messages_for_gpt(self):
         try:
             messages = []
@@ -395,7 +395,7 @@ class GPT:
                 messages.append({"role": "system", "content": system_message})
             except Exception as e:
                 raise RuntimeError(f"Error appending system message: {str(e)}")
-            
+
             # Add previous messages as context
             if self.previous_message_records:
                 messages.append({
@@ -426,7 +426,7 @@ class GPT:
                             prefix = f"You (as {self.ai_role})"
                         else:
                             prefix = ai_role
-                            
+
                         content = msg_record['content']
                         if isinstance(content, (dict, list)):
                             serialized_content = json.dumps(content, ensure_ascii=False)
@@ -449,7 +449,7 @@ class GPT:
                     "role": "system",
                     "content": "The following is CURRENT TURN MESSAGES:"
                 })
-                
+
                 # Sort current messages chronologically
                 current_message_records = sorted(self.current_message_records, key=lambda x: x.get('time_stamp', 0))
                 for msg_record in current_message_records:
@@ -474,7 +474,7 @@ class GPT:
                             prefix = f"You (as {self.ai_role})"
                         else:
                             prefix = ai_role
-                            
+
                         content = msg_record['content']
                         if isinstance(content, (dict, list)):
                             serialized_content = json.dumps(content, ensure_ascii=False)
@@ -495,7 +495,7 @@ class GPT:
         except Exception as e:
             logging.error(f"Error in format_prompt_messages_for_gpt: {str(e)}")
             raise
-    
+
     def get_response(self):
         if self.moderator_condition == 1:
             messages = self.format_prompt_messages_for_gpt()
@@ -514,7 +514,7 @@ class GPT:
                     temperature=0.1
                 )
                 initial_response_time = time.time() - start_time
-                    
+
                 initial_response_text = json.loads(gpt_response.choices[0].message.content)
                 return json.dumps({'plan': initial_response_text['plan'], 'response': initial_response_text['response']})
             except Exception as e:
@@ -541,12 +541,12 @@ class GPT:
                         temperature=0.1
                     )
                     initial_response_time = time.time() - start_time
-                    
+
                     initial_response_text = json.loads(gpt_response.choices[0].message.content)
                     logging.info(f"Initial response: {initial_response_text}")
                     initial_response = initial_response_text['response']
                     logging.info(f"Initial response response: {initial_response}")
-                    
+
                     # Split the response by punctuation
                     sub_sentences = re.split(r'([.;!?])', initial_response)
                     logging.info(f"Sub-sentences: {sub_sentences}")
@@ -561,7 +561,7 @@ class GPT:
                             if sub_sentences[i].strip():  # Only add non-empty strings
                                 processed_sub_sentences.append(sub_sentences[i])
                             i += 1
-                    
+
                     # Filter out empty strings
                     processed_sub_sentences = [s for s in processed_sub_sentences if s.strip()]
                     logging.info(f"Processed sub-sentences: {processed_sub_sentences}")
@@ -569,10 +569,10 @@ class GPT:
                     for sub_sentence in processed_sub_sentences:
                         # Create validation prompt
                         validation_messages = [
-                            {"role": "system", "content": "You are a validator AI. Your task is to determine if the given sub-sentence follows the prompt that was used to generate it. Respond with 'yes' if it follows the prompt, or 'no' if it doesn't."},
+                            {"role": "system", "content": "You are a validator AI. Your task is to determine if the given sub-sentence GENERALLY follows the prompt that was used to generate it (No need to be strict). Respond with 'yes' if it follows the prompt, or 'no' if it doesn't."},
                             {"role": "user", "content": f"Original prompt: {self.format_prompt_messages_for_gpt()}\n\nSub-sentence to validate: {sub_sentence}\n\nDoes this sub-sentence follow the prompt? Answer only with 'yes' or 'no'."}
                         ]
-                        
+
                         start_time = time.time()
                         # Get validation response
                         validation_response = client.chat.completions.create(
@@ -581,22 +581,22 @@ class GPT:
                             temperature=0
                         )
                         validation_time = time.time() - start_time
-                        
+
                         validation_result = validation_response.choices[0].message.content.strip().lower()
                         logging.info(f"Validation result: {validation_result}")
                         # Add to valid sub-sentences if validated
                         if validation_result == 'yes':
                             valid_sub_sentences.append(sub_sentence)
                     logging.info(f"Valid sub-sentences: {valid_sub_sentences}")
-                    
+
                     # If we have valid sub-sentences, break out of the retry loop
                     if valid_sub_sentences:
                         break
-                
+
                 # If no valid sub-sentences after all attempts, return the original response
                 if valid_sub_sentences == []:
                     return json.dumps({'plan': initial_response_text['plan'], 'response': initial_response_text['response']})
-                
+
                 # Merge valid sub-sentences with a third GPT instance
                 merge_messages = [
                     {"role": "system", "content": "You are a coherence AI. Your task is to make the following sub-sentences more coherent and natural, while preserving their original meaning and intent. Make it sound like a normal message in a discussion."},
@@ -610,7 +610,7 @@ class GPT:
                     temperature=0.8
                 )
                 merge_time = time.time() - start_time
-                
+
                 # Get the content from the merge response and handle it properly
                 merge_content = merge_response.choices[0].message.content
                 logging.info(f"Merge content: {merge_content}")
@@ -630,7 +630,7 @@ class GPT:
                     final_response = merge_content.strip()
                 logging.info(f"Final response after parse: {final_response}")
                 logging.info(f"Final response after parse type: {type(final_response)}")
-                
+
                 # Create and save GPTIntermediate record
                 GPTIntermediate.objects.create(
                     group_id=self.group_id,
@@ -644,11 +644,11 @@ class GPT:
                     merge_time=merge_time,
                     gpt_id=self.gpt_id
                 )
-                
+
                 logging.info(f"Initial response time: {initial_response_time}")
                 logging.info(f"Validation response time: {validation_time}")
                 logging.info(f"Merge response time: {merge_time}")
-                
+
                 return json.dumps({'plan': initial_response_text['plan'], 'response': final_response})
             except Exception as e:
                 logging.error(f"Error getting GPT response: {str(e)}")
