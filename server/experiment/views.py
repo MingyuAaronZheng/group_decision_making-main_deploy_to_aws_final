@@ -1215,6 +1215,7 @@ def get_group_current_turn(request):
 
     try:
         group = Group.objects.get(pk=group_id)
+        group.refresh_from_db()
         return JsonResponse({'success': True, 'current_turn': group.current_turn})
     except Group.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Group not found'}, status=404)
