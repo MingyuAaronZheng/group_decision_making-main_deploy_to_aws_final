@@ -13,7 +13,7 @@ class ChatConsumer(WebsocketConsumer):
     def connect(self):
         self.room_name = self.scope['url_route']['kwargs']['room_name']
         # Add 'chat_' prefix to match the group_send in views.py
-        self.chat_group_name = f"chat_{self.room_name}"
+        self.chat_group_name = f"chat:{{{self.room_name}}}"
 
         # Initialize channel_map as a class variable if it doesn't exist
         if not hasattr(ChatConsumer, 'channel_map'):
@@ -126,7 +126,8 @@ class ChatConsumer(WebsocketConsumer):
                 group.save()
             # check if group has capacity
             group.refresh_from_db()
-
+            print(f"Group {self.room_name} has {len(group.activate_member_ids['subject_ids'])} members")
+            print(f"Group size: {group.size}")
             if len(group.activate_member_ids['subject_ids']) < group.size:
                 return {
                     "code": 101,
