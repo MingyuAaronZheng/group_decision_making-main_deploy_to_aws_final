@@ -16,6 +16,8 @@ import logging
 from datetime import datetime
 from django.views.decorators.csrf import ensure_csrf_cookie
 import time
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 SUCCESS_CODE = "CVGW5BEE"
 FAILED_ATTENTION_CODE = "C2ZILU9F"
@@ -696,7 +698,18 @@ def record_message(request):
             group.save(update_fields=['current_turn'])
             logger.info("Incrementing turn counter to %s", group.current_turn)
             response_data['turn_increased'] = True
-
+            # Broadcast turn update via WebSocket
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{group_id}",
+                {
+                    "type": "chat_message",
+                    "message": {
+                        "code": 210,
+                        "current_turn": group.current_turn
+                    }
+                }
+            )
 
     except Exception as e:
         logger.info('Error details: %s', str(e))
