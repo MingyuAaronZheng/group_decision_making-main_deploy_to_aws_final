@@ -19,7 +19,7 @@ import time
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
-SUCCESS_CODE = "CVGW5BEE"
+SUCCESS_CODE = "CHUZDXJH"
 FAILED_ATTENTION_CODE = "C2ZILU9F"
 GO_BACK_TERMINATE_CODE = "C3AXEIWP"
 INACTIVE_TERMINATE_CODE = "C4ZJ8888"
