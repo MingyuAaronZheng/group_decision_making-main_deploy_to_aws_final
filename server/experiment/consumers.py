@@ -270,14 +270,25 @@ class ChatConsumer(WebsocketConsumer):
                     group.member_ids['ready_members'].append(subject_id)
                     group.save()
 
+                # Fetch subject for avatar info
+                subject_obj = Subject.objects.get(pk=subject_id)
+
                 # Check if all human members are ready
                 human_members = [id for id in group.member_ids['subject_ids'] if id > 0]
                 all_ready = all(id in group.member_ids['ready_members'] for id in human_members)
 
+                # Compose ready status response with avatar info
                 response = {
                     "code": 903,  # Ready status update code
                     "ready_members": group.member_ids['ready_members'],
-                    "all_ready": all_ready
+                    "all_ready": all_ready,
+                    "message": {
+                        "sender": {
+                            "subject_id": subject_id,
+                            "avatar_name": subject_obj.avatar_name,
+                            "avatar_color": subject_obj.avatar_color
+                        }
+                    }
                 }
 
                 return response

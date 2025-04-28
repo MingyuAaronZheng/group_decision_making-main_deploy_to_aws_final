@@ -24,6 +24,7 @@ FAILED_ATTENTION_CODE = "C2ZILU9F"
 GO_BACK_TERMINATE_CODE = "C3AXEIWP"
 INACTIVE_TERMINATE_CODE = "C4ZJ8888"
 FAILED_PAIRING_CODE = "C5ZJ8888"
+EARLY_EXIT_CODE = "C6ZJ8888"
 
 
 # Initialize logger
@@ -1295,6 +1296,7 @@ def get_group_member_agreements(request):
 
 @api_view(['POST'])
 def terminate_participation(request):
+    """Terminates a subject's participation in the study."""
     subject_id = request.POST.get('subject_id', None)
     if subject_id is None:
         return JsonResponse({'success': False, 'message': 'Missing subject_id'}, status=400)
@@ -1307,6 +1309,7 @@ def terminate_participation(request):
 
 @api_view(['POST'])
 def submit_to_prolific(request):
+    """Submits a subject's participation in the study to Prolific."""
     json = {}
     subject_id = request.POST.get('subject_id', None)
     status = request.POST.get('status', None)
@@ -1323,12 +1326,19 @@ def submit_to_prolific(request):
             code = INACTIVE_TERMINATE_CODE
         elif status == 'failed_pairing':
             code = FAILED_PAIRING_CODE
+        elif status == 'early_exit':
+            code = EARLY_EXIT_CODE
         else:
             code = FAILED_ATTENTION_CODE
         # Update subject status and timestamps
         subject.end_time = timezone.now()
         subject.active = False
         subject.status = status
+        if status == 'early_exit' or status == 'go_back_terminate' or status == 'inactive_terminate':
+            reasons = request.POST.get('reasons', '[]')
+            other = request.POST.get('other_reason', '')
+            early_exit = EarlyExit.objects.create(subject_id=subject_id, status=status, early_exit_reasons=reasons, early_exit_other=other)
+            early_exit.save()
         subject.save()
         prolific_url = f"https://app.prolific.co/submissions/complete?cc={code}"
         return JsonResponse({'success': True, 'prolific_url': prolific_url})

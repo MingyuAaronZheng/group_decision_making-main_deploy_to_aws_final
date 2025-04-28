@@ -132,9 +132,9 @@ class DemograSurvey(models.Model):
     gender_selection = models.CharField(max_length=1)  # Single-digit option (1-7)
     income_range = models.CharField(max_length=1)  # Single-digit option (1-7)
     education_level = models.CharField(max_length=1)  # Single-digit option (1-7)
-    ethnicity_selection = models.CharField(max_length=1)  # Single-digit option (1-7)
-    religion_affiliation = models.CharField(max_length=1)  # Single-digit option (1-9)
-    political_affiliation = models.CharField(max_length=1)  # Single-digit option (1-8)
+    ethnicity_selection = models.CharField(max_length=255, null=True, blank=True)  # Single-digit option (1-7) or Free-text for other ethnicity option
+    religion_affiliation = models.CharField(max_length=255, null=True, blank=True)  # Single-digit option (1-9) or Free-text for other religion option
+    political_affiliation = models.CharField(max_length=255, null=True, blank=True)  # Single-digit option (1-8) or Free-text for other political affiliation option
     immigration_status = models.CharField(max_length=1)  # Single-digit option (1-6)
     social_media_reading_frequency = models.CharField(max_length=1)  # Single-digit option (1-7)
     social_media_posting_frequency = models.CharField(max_length=1)  # Single-digit option (1-7)
@@ -230,5 +230,15 @@ class GPTIntermediate(models.Model):
     validation_time = models.FloatField(null = True)
     merge_time = models.FloatField(null = True)
     record_time = models.DateTimeField(default=datetime.now, null=True)
+    def __str__(self):
+        return str(self._id)
+
+
+class EarlyExit(models.Model):
+    _id = models.AutoField(auto_created=True, primary_key=True)
+    subject_id = models.IntegerField(default=None)
+    status = models.CharField(max_length=20, default=None)
+    early_exit_reasons = models.TextField(default='[]')
+    early_exit_other = models.TextField(default='')
     def __str__(self):
         return str(self._id)
