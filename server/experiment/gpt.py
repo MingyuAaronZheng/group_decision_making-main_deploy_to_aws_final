@@ -294,7 +294,7 @@ class GPT:
         elif self.participant_condition == 2:  # Disputing AI Participant
             agreement_level_str = ', '.join([f"{name}: {self.AGREEMENT_LEVELS[level]}" for name, level in self.group_member_agreement_levels.items()])
 
-            DISU_ROLE = f'''
+            DISPU_ROLE = f'''
             You are engaging in a structured debate with human participants on a specific policy.
             The policy is {{{{self.group_chat_statement}}}}. Your stance is {{{{self.stance['position']}}}}: [{{self.stance['stance']}}].
             In the debate, there is an opposer who holds an opposing stance: {{{{self.opposing_stance['position']}}}}: [{{self.opposing_stance['stance']}}].
