@@ -525,10 +525,10 @@ def get_statement_frequencies():
 
 def assign_avatars_to_group(group):
     """Assigns unique avatars to all members of a group."""
-    # colors = ['Red', 'Blue', 'Orange']
-    # animals = ['Tiger', 'Wolf', 'Elephant', 'Panda', 'Koala', 'Rabbit']
-    colors = ['Purple', 'Green']
-    animals = ['Fox', 'Penguin']
+    colors = ['Red', 'Blue', 'Orange']
+    animals = ['Tiger', 'Wolf', 'Elephant', 'Panda', 'Koala', 'Rabbit']
+    # colors = ['Purple', 'Green']
+    # animals = ['Fox', 'Penguin']
 
     try:
         group_members = Subject.objects.filter(_id__in=group.member_ids['subject_ids'])
