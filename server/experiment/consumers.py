@@ -14,6 +14,8 @@ class ChatConsumer(WebsocketConsumer):
         self.room_name = self.scope['url_route']['kwargs']['room_name']
         # Add 'chat_' prefix to match the group_send in views.py
         self.chat_group_name = f"chat_{self.room_name}"
+        # in consumers.py, inside connect()
+        print(">>> CHANNEL LAYER CLASS:", self.channel_layer.__class__.__name__)
 
 
         # Initialize channel_map as a class variable if it doesn't exist
