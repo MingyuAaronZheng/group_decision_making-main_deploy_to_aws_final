@@ -381,10 +381,40 @@ def pairing(request):
         return JsonResponse({'success': False, 'message': str(e), 'has_capacity': False}, status=500)
 
 def get_average_waiting_time():
-    time_records = TimeRecord.objects.filter(pair_end_time__isnull=False, pair_start_time__isnull=False)
-    total_waiting_time = sum((time_record.pair_end_time - time_record.pair_start_time).total_seconds() for time_record in time_records)
-    return total_waiting_time / len(time_records) if len(time_records) > 0 else 10
+    try:
+        time_records = TimeRecord.objects.filter(pair_end_time__isnull=False, pair_start_time__isnull=False)
+        if not time_records.exists():
+            logger.info('No time records found with valid pair_start_time and pair_end_time')
+            return 10
 
+        total_waiting_time = 0
+        valid_records = 0
+
+        for time_record in time_records:
+            try:
+                # Ensure both timestamps are valid
+                if time_record.pair_end_time and time_record.pair_start_time:
+                    # Calculate time difference in seconds
+                    wait_time = (time_record.pair_end_time - time_record.pair_start_time).total_seconds()
+                    # Only count positive and reasonable waiting times (less than 10 minutes)
+                    if 0 <= wait_time < 600:
+                        total_waiting_time += wait_time
+                        valid_records += 1
+            except Exception as e:
+                logger.error(f'Error calculating waiting time for record {time_record._id}: {str(e)}')
+                continue
+
+        # Return average or default value
+        if valid_records > 0:
+            average = total_waiting_time / valid_records
+            logger.info(f'Calculated average waiting time: {average} seconds from {valid_records} records')
+            return average
+        else:
+            logger.info('No valid time records for calculation, returning default')
+            return 10
+    except Exception as e:
+        logger.error(f'Error in get_average_waiting_time: {str(e)}')
+        return 10
 
 @api_view(['POST'])
 def set_ready_to_pair(request):
