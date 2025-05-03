@@ -15,6 +15,7 @@ urlpatterns = [
     path('pairing', views.pairing, name='pairing'),
     path('set_ready_to_pair', views.set_ready_to_pair, name='set_ready_to_pair'),
     path('set_not_ready_to_pair', views.set_not_ready_to_pair, name='set_not_ready_to_pair'),
+    path('set_pair_end_time', views.set_pair_end_time, name='set_pair_end_time'),
 
     # Discussion
     path('update_chat_status', views.update_chat_status, name='update_chat_status'),

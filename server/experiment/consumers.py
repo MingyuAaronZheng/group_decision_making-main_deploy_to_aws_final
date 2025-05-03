@@ -143,6 +143,7 @@ class ChatConsumer(WebsocketConsumer):
                     "startable": False
                 }
             else: # if group does not have capacity
+                # Record end pairing time
 
                 response = {
                     "code": 101,

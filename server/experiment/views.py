@@ -445,6 +445,30 @@ def set_ready_to_pair(request):
         logger.error(f'Error in set_ready_to_pair function: {str(e)}', exc_info=True)
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
+
+@api_view(['POST'])
+def set_pair_end_time(request):
+    """Sets a subject's ready_to_pair status to False And record end pairing time."""
+    subject_id = request.POST.get('subject_id', None)
+
+    logger.info(f'Setting ready_to_pair to False for subject_id: {subject_id}')
+
+    if subject_id is None:
+        return JsonResponse({'success': False, 'message': 'Missing subject_id'}, status=400)
+
+    try:
+        time_record = TimeRecord.objects.get(subject_id=subject_id)
+        time_record.pair_end_time = timezone.now()
+        time_record.save()
+
+        return JsonResponse({'success': True, 'message': 'Pairing time recorded'})
+    except TimeRecord.DoesNotExist:
+        logger.error(f'TimeRecord not found: {subject_id}')
+        return JsonResponse({'success': False, 'message': 'TimeRecord not found'}, status=404)
+    except Exception as e:
+        logger.error(f'Error in set_pair_end_time function: {str(e)}', exc_info=True)
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
 @api_view(['POST'])
 def set_not_ready_to_pair(request):
     """Sets a subject's ready_to_pair status to False And record end pairing time."""
@@ -459,10 +483,6 @@ def set_not_ready_to_pair(request):
         subject = Subject.objects.get(pk=subject_id)
         subject.ready_to_pair = False
         subject.save()
-        # Record end pairing time
-        time_record = TimeRecord.objects.get(subject_id=subject_id)
-        time_record.pair_end_time = timezone.now()
-        time_record.save()
 
         return JsonResponse({'success': True, 'message': 'Subject not ready to pair'})
     except Subject.DoesNotExist:
