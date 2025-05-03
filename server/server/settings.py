@@ -50,8 +50,7 @@ ALLOWED_HOSTS = [
     '172.31.16.110',
     '3.13.219.153',
     '3.130.150.227',
-    '3.136.83.160',
-    'awseb--awseb-rv52myysb8hd-22563847.us-east-2.elb.amazonaws.com'
+    '3.136.83.160'
 ]
 
 
@@ -86,8 +85,7 @@ CORS_ORIGIN_WHITELIST = [
     'http://127.0.0.1:8080',
     'https://127.0.0.1:8080',
     'https://main.d93mhbbvrb5dl.amplifyapp.com',
-    'https://main.d3lbr0m46vlu6t.amplifyapp.com',
-    'https://awseb--awseb-rv52myysb8hd-22563847.us-east-2.elb.amazonaws.com'
+    'https://main.d3lbr0m46vlu6t.amplifyapp.com'
 ]
 
 ROOT_URLCONF = 'server.urls'
