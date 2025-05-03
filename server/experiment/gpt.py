@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import os
 import logging
 import time
+from pydantic import BaseModel
 
 logging.basicConfig(
             level=logging.INFO,
@@ -19,6 +20,10 @@ logging.basicConfig(
         )
 
 load_dotenv()
+
+class plan_response(BaseModel):
+    plan: str
+    response: str
 
 '''
     == Moderator Condition Setting ==
@@ -333,7 +338,7 @@ class GPT:
             Format your output in JSON, separating the debate plan from the main arguments.
             '''
 
-            DISU_EX = '''
+            DISPU_EX = '''
             Example JSON output for corresponding Human message:
 
             Human message: "I am strongly against abortion. It's morally wrong."
@@ -378,7 +383,7 @@ class GPT:
             ONLY output the JSON format.
             '''
 
-            system_message = f"{DISU_ROLE}\n{DOs_DONTs}\n{COMMON_1}\n{DISU_EX}\n{COMMON_2}"
+            system_message = f"{DISPU_ROLE }\n{DOs_DONTs}\n{COMMON_1}\n{DISPU_EX}\n{COMMON_2}"
 
         else:
             return ""
@@ -508,10 +513,11 @@ class GPT:
             try:
                 start_time = time.time()
                 # Get initial GPT response
-                gpt_response = client.chat.completions.create(
+                gpt_response = client.beta.chat.completions.parse(
                     model="gpt-4o-mini",
                     messages=messages,
-                    temperature=0.1
+                    temperature=0.1,
+                    response_format=plan_response
                 )
                 initial_response_time = time.time() - start_time
 
@@ -535,10 +541,11 @@ class GPT:
                 for attempt in range(max_attempts):
                     start_time = time.time()
                     # Get initial GPT response
-                    gpt_response = client.chat.completions.create(
+                    gpt_response = client.beta.chat.completions.parse(
                         model="gpt-4o-mini",
                         messages=messages,
-                        temperature=0.1
+                        temperature=0.1,
+                        response_format=plan_response
                     )
                     initial_response_time = time.time() - start_time
 

@@ -18,6 +18,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 import time
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import threading
 
 SUCCESS_CODE = "CHUZDXJH"
 FAILED_ATTENTION_CODE = "C2ZILU9F"
@@ -249,14 +250,7 @@ def pairing(request):
             return JsonResponse({
                 'success': True,
                 'group_id': group._id,
-                'group_capacity': group.size,
-                'moderator_condition': group.group_moderator_condition,
-                'participant_condition': group.group_participant_condition,
-                'chat_statement_indx': group.group_chat_statement_index,
-                'assigned_avatars': group.assigned_avatars,  # Assign avatar to subject
-                'is_third_person': False,
-                'average_waiting_time': get_average_waiting_time(),
-                'has_capacity': group.has_capacity
+                'average_waiting_time': get_average_waiting_time()
             })
 
         # **Step 1: Check if an existing 2-person group needs a third participant**
@@ -275,25 +269,18 @@ def pairing(request):
                 # Assign subject to this group
                 subject.group_id = group._id
                 subject.is_third_person = True  # Mark this subject as the third person
-                subject.random_third_person_prompt = random.choice([0, 1])
+                group.random_third_person_prompt = random.choice([0, 1])
                 subject.save()
 
                 # Since group is now full, assign avatar to subject
                 assigned_avatars = assign_avatars_to_group(group)
                 group.assigned_avatars = assigned_avatars
+                print(f"Assigned avatars to group {group._id}: {assigned_avatars}")
                 group.save()
             return JsonResponse({
                 'success': True,
                 'group_id': group._id,
-                'group_capacity': group.size,
-                'moderator_condition': group.group_moderator_condition,
-                'participant_condition': group.group_participant_condition,
-                'chat_statement_indx': group.group_chat_statement_index,
-                'assigned_avatars': assigned_avatars,  # Assign avatar to subject
-                'is_third_person': True,  # Tell frontend this is the third person
-                'average_waiting_time': get_average_waiting_time(),
-                'has_capacity': group.has_capacity,  # Now False
-                'random_third_person_prompt': subject.random_third_person_prompt
+                'average_waiting_time': get_average_waiting_time()
             })
 
         # **Step 2: No 3-person group available, proceed with normal 2-person pairing**
@@ -376,26 +363,12 @@ def pairing(request):
             return JsonResponse({
                 'success': True,
                 'group_id': group._id,
-                'group_capacity': group.size,
-                'moderator_condition': group.group_moderator_condition,
-                'participant_condition': group.group_participant_condition,
-                'chat_statement_indx': group.group_chat_statement_index,
-                'assigned_avatars': assigned_avatars,
-                'average_waiting_time': get_average_waiting_time(),
-                'is_third_person': False,
-                'has_capacity': group.has_capacity  # Ensures frontend correctly handles redirection
+                'average_waiting_time': get_average_waiting_time()
             })
         # if pair failed
         return JsonResponse({
             'success': False,
-            'group_id': -100,
-            'group_capacity': -100,
-            'moderator_condition': -100,
-            'participant_condition': -100,
-            'chat_statement_indx': -100,
-            'average_waiting_time': get_average_waiting_time(),
-            'is_third_person': False,
-            'has_capacity': True
+            'average_waiting_time': get_average_waiting_time()
         })
 
     except Subject.DoesNotExist:
@@ -525,23 +498,31 @@ def get_statement_frequencies():
 
 def assign_avatars_to_group(group):
     """Assigns unique avatars to all members of a group."""
+    print(f"Starting avatar assignment for group {group._id}")
     colors = ['Red', 'Blue', 'Orange']
     animals = ['Tiger', 'Wolf', 'Elephant', 'Panda', 'Koala', 'Rabbit']
     # colors = ['Purple', 'Green']
     # animals = ['Fox', 'Penguin']
 
+    print(f"Available colors: {colors}")
+    print(f"Available animals: {animals}")
+
     try:
         group_members = Subject.objects.filter(_id__in=group.member_ids['subject_ids'])
+        print(f"Found {len(group_members)} group members to assign avatars to")
 
         # Shuffle to ensure randomness
         random.shuffle(colors)
         random.shuffle(animals)
+        print(f"Shuffled colors: {colors}")
+        print(f"Shuffled animals: {animals}")
 
         assigned_avatars = []
         for member in group_members:
             if colors and animals:
                 color = colors.pop()
                 animal = animals.pop()
+                print(f"Assigning to member {member._id}: {color} {animal}")
                 member.avatar_color = color
                 member.avatar_name = animal
 
@@ -554,14 +535,17 @@ def assign_avatars_to_group(group):
                 try:
                     with transaction.atomic():
                         member.save()
+                        print(f"Saved avatar for member {member._id}")
 
                         # Refresh and verify the update
                         member.refresh_from_db(fields=['avatar_color', 'avatar_name'])
+                        print(f"Verified update for member {member._id}: {member.avatar_color} {member.avatar_name}")
 
                 except Exception as e:
                     logger.error(f'Database update failed for subject {member._id}: {str(e)}')
                     raise
 
+        print(f"Successfully assigned avatars to {len(assigned_avatars)} members")
         return assigned_avatars
 
     except Exception as e:
@@ -835,23 +819,24 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
                     }
                 )
                 # Send typing notification: AI Participant stopped typing
-                time.sleep(1.5)
-
-                async_to_sync(channel_layer.group_send)(
-                    f"chat_{group_id}",
-                    {
-                        'type': 'chat_message',
-                        'message': {
-                            'code': 203,
-                            'typing_info': {
-                                'subject_id': participant_id,
-                                'avatar_name': 'AI Participant',
-                                'avatar_color': '',
-                                'is_typing': False
+                threading.Timer(
+                    2,
+                    lambda: async_to_sync(channel_layer.group_send)(
+                        f"chat_{group_id}",
+                        {
+                            "type": "chat_message",
+                            "message": {
+                                "code": 203,
+                                "typing_info": {
+                                    "subject_id": participant_id,
+                                    "avatar_name": "AI Participant",
+                                    "avatar_color": "",
+                                    "is_typing": False
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                ).start()
                 # Add to current messages for moderator context
                 current_message_records = list(current_message_records)
                 current_message_records.append(gpt_participant_message)
@@ -916,25 +901,24 @@ def send_turn_end_gpt_response(group_id, current_turn_str):
                         }
                     }
                 )
-
-                time.sleep(1.5)
-
-                # Send typing notification: AI Moderator stopped typing
-                async_to_sync(channel_layer.group_send)(
-                    f"chat_{group_id}",
-                    {
-                        'type': 'chat_message',
-                        'message': {
-                            'code': 203,
-                            'typing_info': {
-                                'subject_id': -2,
-                                'avatar_name': 'AI Moderator',
-                                'avatar_color': '',
-                                'is_typing': False
+                threading.Timer(
+                    7,
+                    lambda: async_to_sync(channel_layer.group_send)(
+                        f"chat_{group_id}",
+                        {
+                            "type": "chat_message",
+                            "message": {
+                                "code": 203,
+                                "typing_info": {
+                                    "subject_id": -2,
+                                    "avatar_name": "AI Moderator",
+                                    "avatar_color": "",
+                                    "is_typing": False
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                ).start()
 
     except Exception as e:
         logger.info(f"Error in send_turn_end_gpt_response: %s", str(e))
@@ -1118,6 +1102,19 @@ def confirm_instructions(request):
         time_record = TimeRecord.objects.get(subject_id=subject_id)
         time_record.confirm_instructions_time = timezone.now()
         time_record.save()
+
+        # Notify via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{group_id}",
+            {
+                "type": "chat_message",
+                "message": {
+                    "code": 300,
+                    "all_confirmed": all_confirmed
+                }
+            }
+        )
 
         return JsonResponse({
             'success': True,

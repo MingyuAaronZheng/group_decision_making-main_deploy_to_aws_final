@@ -89,7 +89,7 @@ class Group(models.Model):
 	group_member_agreement_levels = JSONField(default=dict)  # Track member agreement levels
 	# Format: {subject_id: agreement_level}
 	assigned_avatars = JSONField(default=list)  # Track assigned avatars for the group
-
+	random_third_person_prompt = models.IntegerField(default=-1)
 
 
 	def __str__(self):

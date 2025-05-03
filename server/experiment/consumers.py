@@ -80,6 +80,10 @@ class ChatConsumer(WebsocketConsumer):
             print("Received WebSocket data:", text_data_json)
             response = self.chat_code_to_message(text_data_json['code'], text_data_json['data'])
             print(f"Response: {response}")
+            # If response has error, send directly and abort broadcasting
+            if isinstance(response, dict) and response.get('error'):
+                self.send(text_data=json.dumps(response))
+                return
             # Send message to room group
             async_to_sync(self.channel_layer.group_send)(
                 self.chat_group_name,
@@ -119,7 +123,11 @@ class ChatConsumer(WebsocketConsumer):
             ChatConsumer.channel_map[self.channel_name] = subject_id
 
             # Get all members in the group
-            group = Group.objects.get(pk=self.room_name)
+            try:
+                group = Group.objects.get(pk=self.room_name)
+            except Group.DoesNotExist:
+                print(f"Group not found: {self.room_name}")
+                return {"code": 404, "error": f"Group {self.room_name} not found"}
 
             # Add member to active members if not already there
             if subject_id not in group.activate_member_ids['subject_ids']:
@@ -135,9 +143,19 @@ class ChatConsumer(WebsocketConsumer):
                     "startable": False
                 }
             else: # if group does not have capacity
+
                 response = {
                     "code": 101,
-                    "startable": True
+                    "startable": True,
+                    "third_person_id": group.third_person_id,
+                    "has_capacity": group.has_capacity,
+                    "group_id": group._id,
+                    "group_capacity": group.size,
+                    "moderator_condition": group.group_moderator_condition,
+                    "participant_condition": group.group_participant_condition,
+                    "chat_statement_indx": group.group_chat_statement_index,
+                    "assigned_avatars": group.assigned_avatars,
+                    "random_third_person_prompt": group.random_third_person_prompt
                 }
 
             return response
@@ -146,7 +164,11 @@ class ChatConsumer(WebsocketConsumer):
             subject_id = data['subject_id']
             group_id = data['group_id']
             msg = data['msg']
-            group = Group.objects.get(pk=group_id)
+            try:
+                group = Group.objects.get(pk=group_id)
+            except Group.DoesNotExist:
+                print(f"Group not found: {group_id}")
+                return {"code": 404, "error": f"Group {group_id} not found"}
             # Create record and broadcast
             # Only record human messages for turn tracking
             body = {
