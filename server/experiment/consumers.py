@@ -11,6 +11,7 @@ TEST_MODE = True
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
+        self.accept()
         self.room_name = self.scope['url_route']['kwargs']['room_name']
         # Add 'chat_' prefix to match the group_send in views.py
         self.chat_group_name = f"chat_{self.room_name}"
@@ -30,7 +31,7 @@ class ChatConsumer(WebsocketConsumer):
         )
         print("Successfully add to group")
 
-        self.accept()
+
 
     def disconnect(self, close_code):
         print(close_code)
