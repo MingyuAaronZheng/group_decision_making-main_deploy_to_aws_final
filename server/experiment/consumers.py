@@ -1,17 +1,18 @@
 import json
-from asgiref.sync import async_to_sync
-from channels.generic.websocket import WebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer
 from .models import Subject, Group, MessageRecord
 from random import sample
 import random
 from datetime import datetime
 from .views import record_message
+from asgiref.sync import sync_to_async
+import threading
 
 TEST_MODE = True
 
-class ChatConsumer(WebsocketConsumer):
-    def connect(self):
-        self.accept()
+class ChatConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        await self.accept()
         self.room_name = self.scope['url_route']['kwargs']['room_name']
         # Add 'chat_' prefix to match the group_send in views.py
         self.chat_group_name = f"chat_{self.room_name}"
@@ -25,21 +26,20 @@ class ChatConsumer(WebsocketConsumer):
 
         print("Successfully connect chat consumer")
         # Join the chat group
-        async_to_sync(self.channel_layer.group_add)(
+        await self.channel_layer.group_add(
             self.chat_group_name,
             self.channel_name
         )
         print("Successfully add to group")
 
 
-
-    def disconnect(self, close_code):
+    async def disconnect(self, close_code):
         print(close_code)
-        group = Group.objects.get(pk = self.room_name)
+        group = await sync_to_async(Group.objects.get)(pk = self.room_name)
 
         if close_code == 4000:
             group.is_activated = False
-            group.save()
+            await sync_to_async(group.save)()
 
         # Check if channel_map exists and contains this channel
         if hasattr(ChatConsumer, 'channel_map') and self.channel_name in ChatConsumer.channel_map:
@@ -60,9 +60,9 @@ class ChatConsumer(WebsocketConsumer):
                     "leaving_subject": ChatConsumer.channel_map[self.channel_name]
                 }
 
-            group.save()
+            await sync_to_async(group.save)()
 
-            async_to_sync(self.channel_layer.group_send)(
+            await self.channel_layer.group_send(
                 self.room_name,
                 {
                     'type': 'chat_message',
@@ -72,7 +72,7 @@ class ChatConsumer(WebsocketConsumer):
         else:
             print(f"Channel {self.channel_name} not found in channel_map or channel_map not initialized")
 
-    def receive(self, text_data):
+    async def receive(self, text_data):
         print(f"Raw WebSocket message received: {text_data}")
         try:
             text_data_json = json.loads(text_data)
@@ -81,14 +81,14 @@ class ChatConsumer(WebsocketConsumer):
 
             # Print received data for debugging
             print("Received WebSocket data:", text_data_json)
-            response = self.chat_code_to_message(text_data_json['code'], text_data_json['data'])
+            response = await self.chat_code_to_message(text_data_json['code'], text_data_json['data'])
             print(f"Response: {response}")
             # If response has error, send directly and abort broadcasting
             if isinstance(response, dict) and response.get('error'):
-                self.send(text_data=json.dumps(response))
+                await self.send(text_data=json.dumps(response))
                 return
             # Send message to room group
-            async_to_sync(self.channel_layer.group_send)(
+            await self.channel_layer.group_send(
                 self.chat_group_name,
                 {
                     'type': 'chat_message',
@@ -97,28 +97,28 @@ class ChatConsumer(WebsocketConsumer):
             )
         except json.JSONDecodeError as e:
             print(f"Error decoding WebSocket message: {e}")
-            self.send(text_data=json.dumps({
+            await self.send(text_data=json.dumps({
                 'error': 'Invalid message format. Must be valid JSON.'
             }))
         except ValueError as e:
             print(f"Invalid WebSocket message: {e}")
-            self.send(text_data=json.dumps({
+            await self.send(text_data=json.dumps({
                 'error': str(e)
             }))
         except Exception as e:
             print(f"Unexpected error processing WebSocket message: {e}")
-            self.send(text_data=json.dumps({
+            await self.send(text_data=json.dumps({
                 'error': 'An unexpected error occurred.'
             }))
 
-    def chat_message(self, event):
+    async def chat_message(self, event):
         # Receives broadcast message and sends to WebSocket
         message = event['message']
-        self.send(text_data=json.dumps({
+        await self.send(text_data=json.dumps({
             'message': message
         }))
 
-    def chat_code_to_message(self, code, data):
+    async def chat_code_to_message(self, code, data):
         if code == 100:  # Enter room
             subject_id = data['subject_id']
 
@@ -127,7 +127,7 @@ class ChatConsumer(WebsocketConsumer):
 
             # Get all members in the group
             try:
-                group = Group.objects.get(pk=self.room_name)
+                group = await sync_to_async(Group.objects.get)(pk=self.room_name)
             except Group.DoesNotExist:
                 print(f"Group not found: {self.room_name}")
                 return {"code": 404, "error": f"Group {self.room_name} not found"}
@@ -135,9 +135,9 @@ class ChatConsumer(WebsocketConsumer):
             # Add member to active members if not already there
             if subject_id not in group.activate_member_ids['subject_ids']:
                 group.activate_member_ids['subject_ids'].append(subject_id)
-                group.save()
+                await sync_to_async(group.save)()
             # check if group has capacity
-            group.refresh_from_db()
+            await sync_to_async(group.refresh_from_db)()
             print(f"Group {self.room_name} has {len(group.activate_member_ids['subject_ids'])} members")
             print(f"Group size: {group.size}")
             if len(group.activate_member_ids['subject_ids']) < group.size:
@@ -169,7 +169,7 @@ class ChatConsumer(WebsocketConsumer):
             group_id = data['group_id']
             msg = data['msg']
             try:
-                group = Group.objects.get(pk=group_id)
+                group = await sync_to_async(Group.objects.get)(pk=group_id)
             except Group.DoesNotExist:
                 print(f"Group not found: {group_id}")
                 return {"code": 404, "error": f"Group {group_id} not found"}
@@ -180,10 +180,10 @@ class ChatConsumer(WebsocketConsumer):
                     'group_id': group_id,
                     'message': msg
                 }
-            group.refresh_from_db()
+            await sync_to_async(group.refresh_from_db)()
             # Print sender avatar information
-            subject = Subject.objects.get(pk=subject_id)
-            subject.refresh_from_db()
+            subject = await sync_to_async(Subject.objects.get)(pk=subject_id)
+            await sync_to_async(subject.refresh_from_db)()
             print(f"subject_id: {subject_id}")
             print(f"subject: {subject}")
             print(f"group_id: {group_id}")
@@ -201,9 +201,15 @@ class ChatConsumer(WebsocketConsumer):
                     "content": msg
                 }
             }
-            import threading
+            # Use sync_to_async to handle database operations asynchronously
             try:
-                threading.Thread(target=record_message, args=(body,)).start()
+                # Define an async helper function to record messages
+                @sync_to_async
+                def async_record_message(body_data):
+                    record_message(body_data)
+                
+                # Call the async helper function without blocking
+                await async_record_message(body)
             except Exception as error:
                 print(f'Error recording message: {error}')
             return response
@@ -248,7 +254,7 @@ class ChatConsumer(WebsocketConsumer):
             task_no = data['task_no']
             msg = data['msg']
 
-            message_record = MessageRecord.objects.create(subject_id=subject_id, group_id=group_id, instance_id=instance_id, task_no=task_no, message=msg)
+            message_record = await sync_to_async(MessageRecord.objects.create)(subject_id=subject_id, group_id=group_id, instance_id=instance_id, task_no=task_no, message=msg)
 
             response = {
                 "code": 778,
@@ -286,7 +292,7 @@ class ChatConsumer(WebsocketConsumer):
             group_id = data['group_id']
 
             try:
-                group = Group.objects.get(pk=group_id)
+                group = await sync_to_async(Group.objects.get)(pk=group_id)
 
                 # Mark the subject as ready
                 if 'ready_members' not in group.member_ids:
@@ -294,10 +300,10 @@ class ChatConsumer(WebsocketConsumer):
 
                 if subject_id not in group.member_ids['ready_members']:
                     group.member_ids['ready_members'].append(subject_id)
-                    group.save()
+                    await sync_to_async(group.save)()
 
                 # Fetch subject for avatar info
-                subject_obj = Subject.objects.get(pk=subject_id)
+                subject_obj = await sync_to_async(Subject.objects.get)(pk=subject_id)
 
                 # Check if all human members are ready
                 human_members = [id for id in group.member_ids['subject_ids'] if id > 0]

@@ -714,7 +714,6 @@ def record_message(request):
         message = request.get('message')
 
 
-
         # get the group and the current turn number
         group = Group.objects.get(pk=group_id)
         current_turn_str = str(group.current_turn)  # Convert to string for json dict key
