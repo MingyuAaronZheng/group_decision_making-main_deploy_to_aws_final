@@ -510,6 +510,8 @@ class GPT:
                 logging.error(f"Logging error: {e}\nMessage content: {messages}")
                 raise
             client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            if not client.api_key:
+                raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY in your environment variables.")
             try:
                 start_time = time.time()
                 # Get initial GPT response
@@ -534,6 +536,8 @@ class GPT:
                 logging.error(f"Logging error: {e}\nMessage content: {messages}")
                 raise
             client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            if not client.api_key:
+                raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY in your environment variables.")
             try:
                 # Try up to 3 times (initial + 2 retries) to get valid sub-sentences
                 max_attempts = 3

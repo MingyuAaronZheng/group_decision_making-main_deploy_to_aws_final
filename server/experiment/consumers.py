@@ -5,8 +5,7 @@ from random import sample
 import random
 from datetime import datetime
 from .views import record_message
-from asgiref.sync import sync_to_async
-import threading
+from channels.db import database_sync_to_async
 
 TEST_MODE = True
 
@@ -35,11 +34,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         print(close_code)
-        group = await sync_to_async(Group.objects.get)(pk = self.room_name)
+        group = await database_sync_to_async(Group.objects.get)(pk = self.room_name)
 
         if close_code == 4000:
             group.is_activated = False
-            await sync_to_async(group.save)()
+            await database_sync_to_async(group.save)()
 
         # Check if channel_map exists and contains this channel
         if hasattr(ChatConsumer, 'channel_map') and self.channel_name in ChatConsumer.channel_map:
@@ -60,7 +59,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "leaving_subject": ChatConsumer.channel_map[self.channel_name]
                 }
 
-            await sync_to_async(group.save)()
+            await database_sync_to_async(group.save)()
 
             await self.channel_layer.group_send(
                 self.room_name,
@@ -127,7 +126,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             # Get all members in the group
             try:
-                group = await sync_to_async(Group.objects.get)(pk=self.room_name)
+                group = await database_sync_to_async(Group.objects.get)(pk=self.room_name)
             except Group.DoesNotExist:
                 print(f"Group not found: {self.room_name}")
                 return {"code": 404, "error": f"Group {self.room_name} not found"}
@@ -135,9 +134,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Add member to active members if not already there
             if subject_id not in group.activate_member_ids['subject_ids']:
                 group.activate_member_ids['subject_ids'].append(subject_id)
-                await sync_to_async(group.save)()
+                await database_sync_to_async(group.save)()
             # check if group has capacity
-            await sync_to_async(group.refresh_from_db)()
+            await database_sync_to_async(group.refresh_from_db)()
             print(f"Group {self.room_name} has {len(group.activate_member_ids['subject_ids'])} members")
             print(f"Group size: {group.size}")
             if len(group.activate_member_ids['subject_ids']) < group.size:
@@ -146,7 +145,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "startable": False
                 }
             else: # if group does not have capacity
-                # Record end pairing time
 
                 response = {
                     "code": 101,
@@ -169,7 +167,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             group_id = data['group_id']
             msg = data['msg']
             try:
-                group = await sync_to_async(Group.objects.get)(pk=group_id)
+                group = await database_sync_to_async(Group.objects.get)(pk=group_id)
             except Group.DoesNotExist:
                 print(f"Group not found: {group_id}")
                 return {"code": 404, "error": f"Group {group_id} not found"}
@@ -180,10 +178,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'group_id': group_id,
                     'message': msg
                 }
-            await sync_to_async(group.refresh_from_db)()
+            await database_sync_to_async(group.refresh_from_db)()
             # Print sender avatar information
-            subject = await sync_to_async(Subject.objects.get)(pk=subject_id)
-            await sync_to_async(subject.refresh_from_db)()
+            subject = await database_sync_to_async(Subject.objects.get)(pk=subject_id)
+            await database_sync_to_async(subject.refresh_from_db)()
             print(f"subject_id: {subject_id}")
             print(f"subject: {subject}")
             print(f"group_id: {group_id}")
@@ -201,15 +199,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "content": msg
                 }
             }
-            # Use sync_to_async to handle database operations asynchronously
+            import threading
             try:
-                # Define an async helper function to record messages
-                @sync_to_async
-                def async_record_message(body_data):
-                    record_message(body_data)
-                
-                # Call the async helper function without blocking
-                await async_record_message(body)
+                threading.Thread(target=record_message, args=(body,)).start()
             except Exception as error:
                 print(f'Error recording message: {error}')
             return response
@@ -254,7 +246,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             task_no = data['task_no']
             msg = data['msg']
 
-            message_record = await sync_to_async(MessageRecord.objects.create)(subject_id=subject_id, group_id=group_id, instance_id=instance_id, task_no=task_no, message=msg)
+            message_record = await database_sync_to_async(MessageRecord.objects.create)(subject_id=subject_id, group_id=group_id, instance_id=instance_id, task_no=task_no, message=msg)
 
             response = {
                 "code": 778,
@@ -292,7 +284,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             group_id = data['group_id']
 
             try:
-                group = await sync_to_async(Group.objects.get)(pk=group_id)
+                group = await database_sync_to_async(Group.objects.get)(pk=group_id)
 
                 # Mark the subject as ready
                 if 'ready_members' not in group.member_ids:
@@ -300,10 +292,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
                 if subject_id not in group.member_ids['ready_members']:
                     group.member_ids['ready_members'].append(subject_id)
-                    await sync_to_async(group.save)()
+                    await database_sync_to_async(group.save)()
 
                 # Fetch subject for avatar info
-                subject_obj = await sync_to_async(Subject.objects.get)(pk=subject_id)
+                subject_obj = await database_sync_to_async(Subject.objects.get)(pk=subject_id)
 
                 # Check if all human members are ready
                 human_members = [id for id in group.member_ids['subject_ids'] if id > 0]
