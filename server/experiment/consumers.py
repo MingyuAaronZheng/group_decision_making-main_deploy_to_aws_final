@@ -9,6 +9,19 @@ from channels.db import database_sync_to_async
 
 TEST_MODE = True
 
+
+class EchoConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        await self.accept()
+
+    async def receive(self, text_data=None, bytes_data=None):
+        # echo whatever the client sent
+        if text_data is not None:
+            await self.send(text_data=json.dumps({"echo": text_data}))
+        elif bytes_data is not None:
+            await self.send(bytes_data=bytes_data)
+
+
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
