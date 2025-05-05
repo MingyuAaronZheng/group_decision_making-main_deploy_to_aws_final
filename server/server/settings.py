@@ -240,3 +240,7 @@ LOGGING = {
         'channels': {'handlers': ['console'], 'level': 'DEBUG'},
     },
 }
+
+# settings.py
+LOGGING["loggers"]["channels"] = {"handlers":["console"], "level": "DEBUG"}
+LOGGING["loggers"]["django"]   = {"handlers":["console"], "level": "INFO"}
