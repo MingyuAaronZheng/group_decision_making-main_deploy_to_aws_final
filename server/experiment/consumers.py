@@ -84,7 +84,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         else:
             print(f"Channel {self.channel_name} not found in channel_map or channel_map not initialized")
 
-    async def receive(self, text_data, bytes_data=None):
+    async def receive(self, text_data=None, bytes_data=None):
+        print("RAW:", text_data, bytes_data)
         if bytes_data:
             # If your client really needs binary, decode or ignore it here
             print("Got binary frame of", len(bytes_data), "bytes")
