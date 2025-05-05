@@ -19,6 +19,7 @@ import time
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import threading
+import os
 
 SUCCESS_CODE = "CHUZDXJH"
 FAILED_ATTENTION_CODE = "C2ZILU9F"
@@ -383,6 +384,7 @@ def pairing(request):
 def get_average_waiting_time():
     try:
         time_records = TimeRecord.objects.filter(pair_end_time__isnull=False, pair_start_time__isnull=False)
+        print("REDIS_URL:", os.environ['REDIS_URL'])
         if not time_records.exists():
             logger.info('No time records found with valid pair_start_time and pair_end_time')
             return 10
