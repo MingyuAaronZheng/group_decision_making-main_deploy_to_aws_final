@@ -43,3 +43,9 @@ urlpatterns = [
     path('ccw/api/submit_to_prolific', views.submit_to_prolific)
 
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# server/urls.py
+from django.http import HttpResponse
+urlpatterns += [
+    path('ws/healthz', lambda r: HttpResponse('ok')),
+]
