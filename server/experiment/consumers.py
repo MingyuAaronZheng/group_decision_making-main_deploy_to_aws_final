@@ -6,6 +6,7 @@ import random
 from datetime import datetime
 from .views import record_message
 from channels.db import database_sync_to_async
+import os
 
 TEST_MODE = True
 
@@ -30,6 +31,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.chat_group_name = f"chat_{self.room_name}"
         # in consumers.py, inside connect()
         print(">>> CHANNEL LAYER CLASS:", self.channel_layer.__class__.__name__)
+        print("REDIS_URL:", os.environ['REDIS_URL'])
 
 
         # Initialize channel_map as a class variable if it doesn't exist
