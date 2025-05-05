@@ -49,42 +49,54 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         print(close_code)
-        group = await database_sync_to_async(Group.objects.get)(pk = self.room_name)
+        response = await database_sync_to_async(
+            self._update_group_record_on_disconnect
+        )(close_code)
+
+        # 2️⃣  broadcast only if we actually built a message
+        if response:
+            await self.channel_layer.group_send(
+                self.chat_group_name,          # use the same name you joined
+                {"type": "chat_message", "message": response}
+            )
+
+        # 3️⃣  make sure we leave the group so Daphne can close cleanly
+        await self.channel_layer.group_discard(
+            self.chat_group_name, self.channel_name
+        )
+
+    def _update_group_record_on_disconnect(self, close_code):
+        """
+        Runs inside a thread. It's allowed to touch Django ORM directly.
+        Return `response` dict (or None) that we'll broadcast later.
+        """
+        group = Group.objects.get(pk=self.room_name)
 
         if close_code == 4000:
             group.is_activated = False
-            await database_sync_to_async(group.save)()
 
-        # Check if channel_map exists and contains this channel
-        if hasattr(ChatConsumer, 'channel_map') and self.channel_name in ChatConsumer.channel_map:
+        if hasattr(ChatConsumer, "channel_map") \
+           and self.channel_name in ChatConsumer.channel_map:
             subject_id = int(ChatConsumer.channel_map[self.channel_name])
 
-            if group.has_capacity == True: # leave when pairing
-                group.activate_member_ids['subject_ids'].remove(subject_id)
-                group.member_ids['subject_ids'].remove(subject_id)
-                group.current_size = group.current_size - 1
-                response = {
-                    "code": 931,
-                    "leaving_subject": ChatConsumer.channel_map[self.channel_name]
-                }
-            else: #leave when formal task
-                group.activate_member_ids['subject_ids'].remove(ChatConsumer.channel_map[self.channel_name])
-                response = {
-                    "code": 901,
-                    "leaving_subject": ChatConsumer.channel_map[self.channel_name]
-                }
+            if group.has_capacity:
+                group.activate_member_ids["subject_ids"].remove(subject_id)
+                group.member_ids["subject_ids"].remove(subject_id)
+                group.current_size -= 1
+                code = 931
+            else:
+                group.activate_member_ids["subject_ids"].remove(subject_id)
+                code = 901
 
-            await database_sync_to_async(group.save)()
+            group.save()
 
-            await self.channel_layer.group_send(
-                self.room_name,
-                {
-                    'type': 'chat_message',
-                    'message': response
-                }
-            )
-        else:
-            print(f"Channel {self.channel_name} not found in channel_map or channel_map not initialized")
+            return {
+                "code": code,
+                "leaving_subject": subject_id,
+            }
+
+        # channel not in map → nothing to broadcast
+        return None
 
     async def receive(self, text_data=None, bytes_data=None):
         print("RAW:", text_data, bytes_data)
