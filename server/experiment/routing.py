@@ -13,4 +13,7 @@ websocket_urlpatterns = [
         'ws/chat/<str:room_name>/',
         consumers.ChatConsumer.as_asgi()
     ),
+
+	# echo test
+    path("ws/echo/", consumers.EchoConsumer.as_asgi()),
 ]
