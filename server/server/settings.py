@@ -227,11 +227,16 @@ LOGGING = {
             'formatter': 'verbose',
         },
     },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
     'loggers': {
         'experiment': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
         },
+        'channels': {'handlers': ['console'], 'level': 'DEBUG'},
     },
 }
