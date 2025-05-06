@@ -4,6 +4,9 @@ from . import views
 urlpatterns = [
     # Auth & Setup
     path('create_subject', views.create_subject, name='create_subject'),
+    # Custom GPT system message endpoints
+    path('update_system_message', views.update_system_message, name='update_system_message'),
+    path('get_system_message', views.get_system_message, name='get_system_message'),
 
     # Demographic Survey
     path('updateDemograSurvey', views.updateDemograSurvey, name='updateDemograSurvey'),

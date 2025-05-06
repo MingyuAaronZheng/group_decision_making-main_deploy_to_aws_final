@@ -90,7 +90,8 @@ class Group(models.Model):
 	# Format: {subject_id: agreement_level}
 	assigned_avatars = JSONField(default=list)  # Track assigned avatars for the group
 	random_third_person_prompt = models.IntegerField(default=-1)
-
+	# User-customizable system prompt for GPT
+	moderator_custom_system_message = models.TextField(blank=True, default="")
 
 	def __str__(self):
 		return str(self._id)

@@ -699,23 +699,49 @@ def update_chat_status(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-
-
-
-
-
-
-
-
-
-def record_message(request):
-    """Record a message and update turn tracking"""
+@api_view(['POST'])
+def update_system_message(request):
+    """Store a custom GPT system prompt on the Group model."""
+    group_id = request.data.get('group_id')
+    text = request.data.get('system_message', '')
     try:
-        subject_id = int(request.get('subject_id'))
-        group_id = int(request.get('group_id'))
-        message = request.get('message')
+        g = Group.objects.get(pk=group_id)
+        g.moderator_custom_system_message = text
+        print("custom_system_message updated: %s", g.moderator_custom_system_message)
+        g.save()
+        return JsonResponse({'ok': True})
+    except Group.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'no such group'}, status=404)
 
+@api_view(['GET'])
+def get_system_message(request):
+    """Retrieve the custom GPT system prompt for a group."""
+    group_id = request.GET.get('group_id')
+    try:
+        group = Group.objects.get(pk=group_id)
+        group.refresh_from_db()
+        print("custom_system_message retrieved: %s", group.moderator_custom_system_message)
+        gpt = GPT(
+                group_id=group_id,
+                moderator_condition=group.group_moderator_condition,
+                participant_condition=0
+            )
+        print("gpt system_message: %s", gpt.get_system_message())
+        return JsonResponse({'system_message': gpt.get_system_message()})
+    except Group.DoesNotExist:
+        return JsonResponse({'system_message': ''}, status=404)
 
+def record_message(subject_id=None, group_id=None, message=None):
+    """
+    Records a message from a subject
+    Args:
+        subject_id: ID of the subject sending the message
+        group_id: ID of the group the message belongs to
+        message: The message content
+    """
+    try:
+        subject_id = int(subject_id)
+        group_id = int(group_id)
         # get the group and the current turn number
         group = Group.objects.get(pk=group_id)
         current_turn_str = str(group.current_turn)  # Convert to string for json dict key
@@ -772,7 +798,6 @@ def record_message(request):
 
     except Exception as e:
         logger.info('Error details: %s', str(e))
-        logger.info('Request data: %s', request)
         logger.info('Group ID: %s', group_id)
         logger.info('Subject ID: %s', subject_id)
         logger.info('Message: %s', message)

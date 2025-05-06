@@ -27,12 +27,12 @@ application = ProtocolTypeRouter({
 	)
 })
 
-from server.tap import TapMiddleware      #  add
-application = TapMiddleware(              #  add
-    ProtocolTypeRouter({
-        "http": django_asgi_app,
-        "websocket": AuthMiddlewareStack(
-            URLRouter(experiment.routing.websocket_urlpatterns)
-        ),
-    })
-)
+# from server.tap import TapMiddleware      #  add
+# application = TapMiddleware(              #  add
+#     ProtocolTypeRouter({
+#         "http": django_asgi_app,
+#         "websocket": AuthMiddlewareStack(
+#             URLRouter(experiment.routing.websocket_urlpatterns)
+#         ),
+#     })
+# )

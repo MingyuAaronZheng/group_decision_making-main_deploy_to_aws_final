@@ -7,6 +7,8 @@ from datetime import datetime
 from .views import record_message
 from channels.db import database_sync_to_async
 import os
+from django.http import HttpRequest
+from django.test import RequestFactory
 
 TEST_MODE = True
 
@@ -31,7 +33,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.chat_group_name = f"chat_{self.room_name}"
         # in consumers.py, inside connect()
         print(">>> CHANNEL LAYER CLASS:", self.channel_layer.__class__.__name__)
-        print("REDIS_URL:", os.environ['REDIS_URL'])
+        if 'REDIS_URL' in os.environ:
+            print("REDIS_URL:", os.environ['REDIS_URL'])
+        else:
+            print("REDIS_URL not found in environment variables")
 
 
         # Initialize channel_map as a class variable if it doesn't exist
@@ -234,7 +239,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
             import threading
             try:
-                threading.Thread(target=record_message, args=(body,)).start()
+                # Pass data directly to avoid request object issues
+                threading.Thread(target=record_message, kwargs={
+                    'subject_id': body['subject_id'],
+                    'group_id': body['group_id'],
+                    'message': body['message']
+                }).start()
             except Exception as error:
                 print(f'Error recording message: {error}')
             return response

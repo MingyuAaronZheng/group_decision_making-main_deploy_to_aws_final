@@ -121,7 +121,15 @@ class GPT:
         print("initialized gpt")
 
     def get_system_message(self):
+        # If group has a custom system prompt set by user, use that
+
         if self.moderator_condition == 1:
+            try:
+                group_obj = Group.objects.get(pk=self.group_id)
+                if getattr(group_obj, 'moderator_custom_system_message', '').strip():
+                    return group_obj.moderator_custom_system_message
+            except Group.DoesNotExist:
+                pass
             print("start get agreement levels")
             agreement_level_str = ', '.join([f"{name}: {self.AGREEMENT_LEVELS[level]}" for name, level in self.group_member_agreement_levels.items()])
             print("get agreement levels:", agreement_level_str)
@@ -141,10 +149,10 @@ class GPT:
             - Example: "Could you share more about why this aspect of the policy matters to you? What outcomes are you hoping to achieve?"
             2.	Identify Shared and Divergent Interests
             - Actively listen to highlight common goals and areas of divergence.
-            - Example: "Both parties value [shared interest]. How might we address [divergent point] in a way that respects these shared priorities?"
+            - Example: "All parties value [shared interest]. How might we address [divergent point] in a way that respects these shared priorities?"
             3.	Facilitate Joint Problem-Solving
             - Guide users to brainstorm integrative solutions that address all parties’ core concerns.
-            - Example: "Let’s explore options that incorporate [Party A’s need] and [Party B’s need]. What creative adjustments could satisfy both?"
+            - Example: "Let’s explore options that incorporate [Party A’s need] and [Party B’s need]. What creative adjustments could satisfy all?"
             4.	Promote Mutual Understanding
             - Paraphrase viewpoints to ensure clarity and validate emotions/norms (e.g., fairness, ethics).
             - Example: "It sounds like [Party A] is prioritizing [X], while [Party B] is emphasizing [Y]. How might we reconcile these ethically?"
@@ -174,7 +182,7 @@ class GPT:
             {{
               "plan": "Identify areas where participants disagree on factual claims and
               prompt them to provide evidence for their positions.",
-              "response": "I notice you both have different views on the economic impact.
+              "response": "I notice you all have different views on the economic impact.
               Could you share specific data or examples that support your perspective on
               how this policy would affect local communities?"
             }}
@@ -182,7 +190,7 @@ class GPT:
             {{
               "plan": "Bridge opposing viewpoints by highlighting common ground and
               encouraging deeper exploration of shared concerns.",
-              "response": "It seems you both care about public safety. How do you think
+              "response": "It seems you all care about public safety. How do you think
               we could address the safety concerns while also considering the points about
               individual rights that were raised?"
             }}
@@ -192,9 +200,7 @@ class GPT:
               "response": "Education reform is essential for preparing students with skills relevant to modern industries. Updating curricula to include technology and critical thinking can foster a stronger, more adaptable workforce. While change may disrupt traditional methods, the benefits of an educated and capable workforce outweigh the challenges."
             }}
 
-            The response should be your complete message to the participants. The JSON
-            output should only contain the "plan" and your overall "response"
-            \n\nUse " instead of \\"\n\nONLY output the JSON format
+            The response should be your complete message to the all participants including AI participants.
             '''
         elif self.participant_condition == 1:  # ADVOCATING AI Participant
             agreement_level_str = ', '.join([f"{name}: {self.AGREEMENT_LEVELS[level]}" for name, level in self.group_member_agreement_levels.items()])
@@ -273,25 +279,6 @@ class GPT:
 
             COMMON_2 = '''
             The response should be CONCISE and contain everything you want to say to the opposer.
-            The JSON output should only include the "plan" and the "response".
-
-            Use standard JSON formatting with double quotes (") instead of escaped characters.
-
-            DONT's use the following format:
-            ```json
-            {
-                "plan": ""
-                "response": ""
-            }
-            ```
-            DO use the following format:
-            {
-                "plan": ""
-                "response": ""
-            }
-
-
-            ONLY output the JSON format.
             '''
 
             system_message = f"{ADVO_ROLE}\n{DOs_DONTs}\n{COMMON_1}\n{ADVO_EX}\n{ADVO_DONT_EX}\n{COMMON_2}"
@@ -362,25 +349,6 @@ class GPT:
 
             COMMON_2 = '''
             The response should be CONCISE and contain everything you want to say to the opposer.
-            The JSON output should only include the "plan" and the "response".
-
-            Use standard JSON formatting with double quotes (") instead of escaped characters.
-
-            DONT's use the following format:
-            ```json
-            {
-                "plan": ""
-                "response": ""
-            }
-            ```
-
-            DO use the following format:
-            {
-                "plan": ""
-                "response": ""
-            }
-
-            ONLY output the JSON format.
             '''
 
             system_message = f"{DISPU_ROLE }\n{DOs_DONTs}\n{COMMON_1}\n{DISPU_EX}\n{COMMON_2}"
