@@ -114,7 +114,7 @@ ASGI_APPLICATION = 'server.asgi.application'
 if 'REDIS_URL' in os.environ:
     CHANNEL_LAYERS = {
         'default' : {
-            'BACKEND': 'server.redis_layer.TaggedRedisChannelLayer',
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
                 "hosts": [
                     (os.environ["REDIS_URL"], 6379),

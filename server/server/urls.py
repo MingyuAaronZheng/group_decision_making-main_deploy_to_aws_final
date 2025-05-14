@@ -38,8 +38,8 @@ urlpatterns = [
     path('ccw/api/get_group_current_turn', views.get_group_current_turn),
     path('ccw/api/get_group_member_agreements', views.get_group_member_agreements),
     path('ccw/api/terminate_participation', views.terminate_participation),
-    path('ccw/api/set_pair_end_time', views.set_pair_end_time),
-    path('ccw/api/set_not_ready_to_pair', views.set_not_ready_to_pair),
+    path('ccw/api/set_pipei_end_time', views.set_pipei_end_time),
+    path('ccw/api/set_not_ready', views.set_not_ready),
     path('ccw/api/submit_to_prolific', views.submit_to_prolific)
 
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

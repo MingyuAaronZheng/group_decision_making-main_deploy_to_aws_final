@@ -419,7 +419,7 @@ def get_average_waiting_time():
         return 10
 
 @api_view(['POST'])
-def set_ready_to_pair(request):
+def set_pipei(request):
     """Sets a subject's ready_to_pair status to True And record start pairing time."""
     subject_id = request.POST.get('subject_id', None)
 
@@ -449,7 +449,7 @@ def set_ready_to_pair(request):
 
 
 @api_view(['POST'])
-def set_pair_end_time(request):
+def set_pipei_end_time(request):
     """Sets a subject's ready_to_pair status to False And record end pairing time."""
     subject_id = request.POST.get('subject_id', None)
 
@@ -472,11 +472,11 @@ def set_pair_end_time(request):
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 @api_view(['POST'])
-def set_not_ready_to_pair(request):
+def set_not_ready(request):
     """Sets a subject's ready_to_pair status to False And record end pairing time."""
     subject_id = request.POST.get('subject_id', None)
 
-    logger.info(f'Setting ready_to_pair to False for subject_id: {subject_id}')
+    # logger.info(f'Setting ready_to_pair to False for subject_id: {subject_id}')
 
     if subject_id is None:
         return JsonResponse({'success': False, 'message': 'Missing subject_id'}, status=400)

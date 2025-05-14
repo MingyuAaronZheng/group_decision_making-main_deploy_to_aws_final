@@ -16,9 +16,9 @@ urlpatterns = [
     path('get_group_current_turn', views.get_group_current_turn, name='get_group_current_turn'),
     path('confirm_instructions', views.confirm_instructions, name='confirm_instructions'),
     path('pairing', views.pairing, name='pairing'),
-    path('set_ready_to_pair', views.set_ready_to_pair, name='set_ready_to_pair'),
-    path('set_not_ready_to_pair', views.set_not_ready_to_pair, name='set_not_ready_to_pair'),
-    path('set_pair_end_time', views.set_pair_end_time, name='set_pair_end_time'),
+    path('set_pipei', views.set_pipei, name='set_pipei'),
+    path('set-not-ready', views.set_not_ready, name='set_not_ready'),
+    path('set_pipei_end_time', views.set_pipei_end_time, name='set_pipei_end_time'),
 
     # Discussion
     path('update_chat_status', views.update_chat_status, name='update_chat_status'),
