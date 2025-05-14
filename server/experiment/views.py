@@ -57,6 +57,14 @@ from rest_framework.decorators import api_view
 import random
 from .models import Subject, Group, TimeRecord
 
+
+from django.http import HttpResponse
+
+@api_view(['GET'])
+def health_check(request):
+    return HttpResponse("OK")
+
+
 @api_view(['POST'])
 def create_subject(request):
     worker_id = request.POST.get('worker_id', None)

@@ -40,7 +40,9 @@ urlpatterns = [
     path('ccw/api/terminate_participation', views.terminate_participation),
     path('ccw/api/set_pipei_end_time', views.set_pipei_end_time),
     path('ccw/api/set_not_ready', views.set_not_ready),
-    path('ccw/api/submit_to_prolific', views.submit_to_prolific)
+    path('ccw/api/submit_to_prolific', views.submit_to_prolific),
+    path('health/', views.health_check, name='health')
+
 
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 

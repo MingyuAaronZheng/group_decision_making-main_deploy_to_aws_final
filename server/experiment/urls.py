@@ -35,5 +35,8 @@ urlpatterns = [
 
     # Debug endpoints
     path('debug_pre_discussion_surveys', views.debug_pre_discussion_surveys, name='debug_pre_discussion_surveys'),
-    path('submit_to_prolific', views.submit_to_prolific, name='submit_to_prolific')
+    path('submit_to_prolific', views.submit_to_prolific, name='submit_to_prolific'),
+
+    # Health check for ALB
+    path('health/', views.health_check, name='health')
 ]
