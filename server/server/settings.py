@@ -27,9 +27,18 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
     '172.31.12.2',
+    '18.235.57.99',
+    '34.233.106.112',
     '172.31.25.73',
+    '54.209.49.172',
     '172.31.89.157',
+    'crowd.cs.purdue.edu',
+    'yuchun.org',
+    'www.yuchun.org',
+    'devil-dev.us-east-1.elasticbeanstalk.com',
     '172.31.6.115',
+    'devil-advocate.hci-study.com',
+    'www.devil-advocate.hci-study.com',
     'http://group-discussion-experiment.us-east-2.elasticbeanstalk.com',
     'www.group-discussion-experiment.us-east-2.elasticbeanstalk.com',
     'gobackend.discussionexperiment.com',
@@ -41,8 +50,7 @@ ALLOWED_HOSTS = [
     '172.31.16.110',
     '172.31.31.69',
     '172.31.19.97',
-    '18.117.235.35',
-    '3.134.10.142'
+    '100.116.133.2:8000'
 ]
 
 
