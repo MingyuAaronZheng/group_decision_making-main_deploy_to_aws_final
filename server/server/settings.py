@@ -50,7 +50,11 @@ ALLOWED_HOSTS = [
     '172.31.16.110',
     '172.31.31.69',
     '172.31.19.97',
-    '100.116.133.2:8000'
+    '100.116.133.2:8000',
+    'main.d1lwa086vbiduv.amplifyapp.com',
+    'www.main.d1lwa086vbiduv.amplifyapp.com',
+    'https://main.d1lwa086vbiduv.amplifyapp.com',
+    'www.main.d1lwa086vbiduv.amplifyapp.com'
 ]
 
 
@@ -85,7 +89,8 @@ CORS_ORIGIN_WHITELIST = [
     'http://127.0.0.1:8080',
     'https://127.0.0.1:8080',
     'https://main.d93mhbbvrb5dl.amplifyapp.com',
-    'https://main.d3lbr0m46vlu6t.amplifyapp.com'
+    'https://main.d3lbr0m46vlu6t.amplifyapp.com',
+    'https://main.d1lwa086vbiduv.amplifyapp.com'
 ]
 
 ROOT_URLCONF = 'server.urls'
@@ -211,36 +216,77 @@ STATIC_URL = '/static/'
 # Test Mode
 TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'
 
-# Logging configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-    'loggers': {
-        'experiment': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'channels': {'handlers': ['console'], 'level': 'DEBUG'},
-    },
-}
+# Ensure logs directory exists
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
 
-# settings.py
-LOGGING["loggers"]["channels"] = {"handlers":["console"], "level": "DEBUG"}
-LOGGING["loggers"]["django"]   = {"handlers":["console"], "level": "INFO"}
+# Logging configuration
+def get_logging_config():
+    """Return the appropriate logging configuration based on the environment."""
+    if DEBUG:
+        # In development, only log from the main process to avoid duplicates
+        if os.environ.get('RUN_MAIN') or not os.environ.get('WERKZEUG_RUN_MAIN'):
+            console_handler = 'console'
+        else:
+            console_handler = 'null'
+    else:
+        # In production, log everything
+        console_handler = 'console'
+
+    return {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {message}',
+                'style': '{',
+            },
+            'detailed': {
+                'format': '{asctime} - {name} - {levelname} - {message}',
+                'style': '{',
+            },
+        },
+        'handlers': {
+            'null': {
+                'class': 'logging.NullHandler',
+            },
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose',
+            },
+            'file': {
+                'level': 'INFO',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': os.path.join(LOG_DIR, 'django.log'),
+                'maxBytes': 1024*1024*5,  # 5 MB
+                'backupCount': 5,
+                'formatter': 'detailed',
+                'encoding': 'utf8',
+            },
+        },
+        'root': {
+            'handlers': [console_handler, 'file'],
+            'level': 'INFO',
+        },
+        'loggers': {
+            'experiment': {
+                'handlers': [console_handler, 'file'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'channels': {
+                'handlers': [console_handler, 'file'],
+                'level': 'DEBUG' if DEBUG else 'INFO',
+                'propagate': False,
+            },
+            'django': {
+                'handlers': [console_handler, 'file'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+        },
+    }
+
+# Apply the logging configuration
+LOGGING = get_logging_config()

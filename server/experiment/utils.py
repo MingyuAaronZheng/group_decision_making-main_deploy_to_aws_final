@@ -36,6 +36,7 @@ def get_group_member_agreement_levels(group_id):
                     continue
                 agreement = response.get('agreement')
                 combined_responses[member['avatar_color'] + ' ' + member['avatar_name']] = agreement
+                logger.info("Agreement level of chat statement %s for subject %s: %s", chat_statement_index, member['_id'], agreement)
             except PreDSurvey.DoesNotExist:
                 logger.warning(f'No pre-discussion survey found for subject {member["_id"]}')
                 continue
@@ -45,7 +46,7 @@ def get_group_member_agreement_levels(group_id):
                 'success': False,
                 'message': 'No pre-discussion surveys found for group members'
             }, status=404)
-
+        logger.info("Agreement levels of chat statement %s for group %s: %s", chat_statement_index, group_id, combined_responses)
         return combined_responses
     except Exception as e:
         logger.exception(f'Error in get_group_member_agreement_levels: {e}')

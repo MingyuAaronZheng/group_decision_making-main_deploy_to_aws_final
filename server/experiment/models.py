@@ -11,6 +11,7 @@ class Subject(models.Model):
 	group_id = models.IntegerField(default = -1)
 	is_third_person = models.BooleanField(default=False)
 	active = models.BooleanField(default=True)  # Track if user is currently active
+	chatting = models.BooleanField(default=False)  # Track if user is currently in a chat session
 	confirmed_instructions = models.BooleanField(default=False)  # Track if third person has confirmed instructions
 	random_third_person_prompt = models.IntegerField(default=-1)  # Track if third person has confirmed instructions
 	ready_to_pair = models.BooleanField(default=False)  # Track if subject is ready to be paired
@@ -20,7 +21,6 @@ class Subject(models.Model):
 	end_time = models.DateTimeField(default = None, blank=True, null = True)
 	pair_start_time = models.DateTimeField(default = None, blank=True, null = True)
 	pair_end_time = models.DateTimeField(default = None, blank=True, null = True)
-	last_active_time = models.DateTimeField(default = None, blank=True, null = True)
 	'''
 	== moderator_condition Setting ==
 	0: No AI Moderator

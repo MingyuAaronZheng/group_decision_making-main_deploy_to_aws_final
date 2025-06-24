@@ -9,9 +9,21 @@ from channels.db import database_sync_to_async
 import os
 from django.http import HttpRequest
 from django.test import RequestFactory
+import logging
 
 TEST_MODE = True
 
+# Initialize logger
+today = datetime.today()
+log_file_name = f'experiment/logs/consumers_{today.strftime("%Y%m%d")}.log'
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file_name, mode='a')
+    ]
+)
+logger = logging.getLogger(__name__)
 
 class EchoConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -32,28 +44,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Add 'chat_' prefix to match the group_send in views.py
         self.chat_group_name = f"chat_{self.room_name}"
         # in consumers.py, inside connect()
-        print(">>> CHANNEL LAYER CLASS:", self.channel_layer.__class__.__name__)
+        logger.info(">>> CHANNEL LAYER CLASS:", self.channel_layer.__class__.__name__)
         if 'REDIS_URL' in os.environ:
-            print("REDIS_URL:", os.environ['REDIS_URL'])
+            logger.info("REDIS_URL:", os.environ['REDIS_URL'])
         else:
-            print("REDIS_URL not found in environment variables")
+            logger.info("REDIS_URL not found in environment variables")
 
 
         # Initialize channel_map as a class variable if it doesn't exist
         if not hasattr(ChatConsumer, 'channel_map'):
             ChatConsumer.channel_map = {}
 
-        print("Successfully connect chat consumer")
+        logger.info("Successfully connect chat consumer, room name: %s, chat group name: %s", self.room_name, self.chat_group_name)
         # Join the chat group
         await self.channel_layer.group_add(
             self.chat_group_name,
             self.channel_name
         )
-        print("Successfully add to group")
+        logger.info("Successfully add to group, room name: %s, chat group name: %s", self.room_name, self.chat_group_name)
 
 
     async def disconnect(self, close_code):
-        print(close_code)
+        logger.info("close_code: %s", close_code)
         response = await database_sync_to_async(
             self._update_group_record_on_disconnect
         )(close_code)
@@ -168,6 +180,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             except Group.DoesNotExist:
                 print(f"Group not found: {self.room_name}")
                 return {"code": 404, "error": f"Group {self.room_name} not found"}
+
+            # Update subject's chatting status to True
+            try:
+                subject = await database_sync_to_async(Subject.objects.get)(pk=subject_id)
+                if not subject.chatting:  # Only update if not already chatting
+                    subject.chatting = True
+                    await database_sync_to_async(subject.save)()
+                    logger.info(f"Subject {subject_id} entered chat room, set chatting=True")
+            except Subject.DoesNotExist:
+                logger.error(f"Subject {subject_id} not found when entering chat room")
+                return {"code": 404, "error": f"Subject {subject_id} not found"}
 
             # Add member to active members if not already there
             if subject_id not in group.activate_member_ids['subject_ids']:
@@ -362,6 +385,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             except Group.DoesNotExist:
                 return None
+                
+        elif code == 130:  # Leave room
+            subject_id = data  # data contains the subject_id
+            try:
+                # Update the subject's chatting status to False
+                subject = await database_sync_to_async(Subject.objects.get)(pk=subject_id)
+                subject.chatting = False
+                await database_sync_to_async(subject.save)()
+                logger.info(f"Subject {subject_id} left the chat room, set chatting=False")
+                return {
+                    "code": 131,  # Success response code
+                    "message": "Successfully left the chat room"
+                }
+            except Subject.DoesNotExist:
+                logger.error(f"Subject {subject_id} not found when trying to leave chat room")
+                return {
+                    "code": 404,
+                    "error": f"Subject {subject_id} not found"
+                }
         else:
             # Default response for unhandled codes
             return {

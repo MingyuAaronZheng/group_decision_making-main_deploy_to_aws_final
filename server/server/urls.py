@@ -30,12 +30,10 @@ urlpatterns = [
     # Legacy URLs that haven't been moved yet
     path('ccw/api/create_subject', views.create_subject),
     path('ccw/api/update_demogra_survey', views.updateDemograSurvey),
-    path('ccw/api/get_subject_info', views.get_subject_info),
     path('ccw/api/Update_pre_discussion_survey', views.Update_pre_discussion_survey),
     path('ccw/api/update_chat_status', views.update_chat_status),
     path('ccw/api/post_do_survey', views.post_do_survey),
     path('ccw/api/post_df_survey', views.post_df_survey),
-    path('ccw/api/get_group_current_turn', views.get_group_current_turn),
     path('ccw/api/get_group_member_agreements', views.get_group_member_agreements),
     path('ccw/api/terminate_participation', views.terminate_participation),
     path('ccw/api/set_pipei_end_time', views.set_pipei_end_time),
