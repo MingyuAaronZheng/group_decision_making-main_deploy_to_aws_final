@@ -30,6 +30,7 @@ urlpatterns = [
 
     # Activity termination
     path('terminate_participation', views.terminate_participation, name='terminate_participation'),
+    path('client_logs', views.client_logs, name='client_logs'),
 
     # Debug endpoints
     path('submit_to_prolific', views.submit_to_prolific, name='submit_to_prolific'),

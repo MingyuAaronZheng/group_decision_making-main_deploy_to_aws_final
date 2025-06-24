@@ -1482,16 +1482,94 @@ def get_group_member_agreements(request):
 @api_view(['POST'])
 def terminate_participation(request):
     """Terminates a subject's participation in the study."""
+    import logging
+    import json
+    from django.conf import settings
+    import os
+    from datetime import datetime
+    
+    # Set up logging
+    log_dir = os.path.join(settings.BASE_DIR, 'server', 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'termination_requests.log')
+    
+    # Configure logging to file
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler()
+        ]
+    )
+    
+    # Log the incoming request
+    request_id = f"req_{int(datetime.now().timestamp() * 1000)}"
+    client_ip = request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR')
+    
+    logging.info(f"[{request_id}] Received termination request. IP: {client_ip}, Headers: {dict(request.headers)}")
+    
     subject_id = request.POST.get('subject_id', None)
     if subject_id is None:
+        logging.error(f"[{request_id}] Missing subject_id in request")
         return JsonResponse({'success': False, 'message': 'Missing subject_id'}, status=400)
+        
+    logging.info(f"[{request_id}] Processing termination for subject_id: {subject_id}")
+    
     try:
         subject = Subject.objects.get(pk=subject_id)
+        logging.info(f"[{request_id}] Found subject: {subject_id}, current active status: {subject.active}")
+        
+        if not subject.active:
+            logging.warning(f"[{request_id}] Subject {subject_id} was already inactive")
+            return JsonResponse({'success': True, 'message': 'Subject was already inactive'})
+            
         subject.active = False
         subject.save(update_fields=['active'])
-        return JsonResponse({'success': True})
+        logging.info(f"[{request_id}] Successfully deactivated subject {subject_id}")
+        
+        return JsonResponse({'success': True, 'request_id': request_id})
+        
     except Subject.DoesNotExist:
+        logging.error(f"[{request_id}] Subject not found: {subject_id}")
         return JsonResponse({'success': False, 'message': 'Subject not found'}, status=404)
+    except Exception as e:
+        logging.error(f"[{request_id}] Error processing termination for {subject_id}: {str(e)}", exc_info=True)
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+
+@api_view(['POST'])
+def client_logs(request):
+    """
+    Receives and stores client-side logs.
+    Expected POST data:
+    - logs: The log messages as a string
+    - page: The page where the logs originated
+    - timestamp: When the logs were sent
+    """
+    try:
+        logs = request.POST.get('logs', '')
+        page = request.POST.get('page', 'unknown')
+        timestamp = request.POST.get('timestamp', '')
+        
+        if not logs:
+            return JsonResponse({'success': False, 'message': 'No logs provided'}, status=400)
+            
+        # Save logs to file using our utility function
+        from .logging_utils import save_client_logs
+        success, message = save_client_logs({
+            'logs': logs,
+            'page': page,
+            'timestamp': timestamp or datetime.now().isoformat()
+        })
+        
+        if success:
+            return JsonResponse({'success': True, 'message': message})
+        else:
+            return JsonResponse({'success': False, 'message': message}, status=500)
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 
 @api_view(['POST'])
