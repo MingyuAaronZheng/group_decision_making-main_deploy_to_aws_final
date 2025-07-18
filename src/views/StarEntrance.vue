@@ -1,7 +1,7 @@
 <template>
   <div class="star-entrance-bg">
     <b-jumbotron header="Welcome to our group discussion study!" header-level="4" class="mb-4 shadow-lg entrance-jumbotron">
-      <div class="page-indicator text-center mb-1">Page: 1 / 10</div>
+      <div class="page-indicator text-center mb-1">Page: 1 / 9</div>
       <div class="content-area bg-white p-4 rounded-lg entrance-content">
         <p class="entrance-section-title">
           In this study, you will be asked to complete a series of tasks, including:
@@ -21,7 +21,7 @@
           </b-list-group-item>
         </b-list-group>
         <p class="entrance-section-title">
-          The entire process is expected to take approximately <b>20–25 minutes</b>. Your responses will remain confidential and will be used exclusively for research purposes to ensure the integrity and impact of the findings.
+          The entire process is expected to take approximately <b>20 minutes</b>. Your responses will remain confidential and will be used exclusively for research purposes to ensure the integrity and impact of the findings.
           <br>
           <span class="text-info entrance-section-subline">You may take part in this study only once.</span>
         </p>

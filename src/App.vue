@@ -29,7 +29,7 @@ export default {
   name: 'App',
   computed: {
     isErrorPage () {
-      return ['FailPairing', 'FailAttention', 'GoBackTerminatedParticipation', 'InactivityTerminatedParticipation', 'EarlyExit', 'DeBriefing', 'StarEntrance'].includes(this.$route.name)
+      return ['FailPairing', 'GoBackTerminatedParticipation', 'InactivityTerminatedParticipation', 'EarlyExit', 'DeBriefing', 'StarEntrance'].includes(this.$route.name)
     }
   },
   data () {

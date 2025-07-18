@@ -3,7 +3,7 @@
     <!-- Hidden iframe for termination requests -->
     <iframe id="termination-frame" style="display: none;"></iframe>
     <b-jumbotron header-level="5">
-    <div class="content-area"><div class="page-indicator text-center mb-1">Page: 6 / 10</div></div>
+    <div class="content-area"><div class="page-indicator text-center mb-1">Page: 5 / 9</div></div>
     <template v-slot:header>
       Pairing You with Other Participants
     </template>

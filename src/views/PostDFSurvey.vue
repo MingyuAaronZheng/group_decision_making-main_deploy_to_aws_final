@@ -1,6 +1,6 @@
 <template>
   <div class="centered-survey-wrapper">
-    <div class="page-indicator text-center mb-1">Page: 9 / 10</div>
+    <div class="page-indicator text-center mb-1">Page: 8 / 9</div>
     <div class="intro-center-frame">
       <b-jumbotron header-level="5" class="highlighted-lead">
         <template v-slot:lead>

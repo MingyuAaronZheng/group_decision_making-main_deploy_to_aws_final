@@ -1,6 +1,6 @@
 <template>
   <div class="chat-room">
-    <div class="page-indicator text-center mb-1">Page: 7 / 10</div>
+    <div class="page-indicator text-center mb-1">Page: 6 / 9</div>
     <!-- Chat Statement, User's Stance, and User's Name with Instructions -->
     <b-row class="align-items-start mb-3 mx-0 no-gutters">
       <!-- Left Column: User Info -->

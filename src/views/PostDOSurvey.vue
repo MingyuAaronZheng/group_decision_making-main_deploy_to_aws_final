@@ -1,6 +1,6 @@
 <template>
   <div class="centered-survey-wrapper">
-    <div class="page-indicator text-center mb-1">Page: 8 / 10</div>
+    <div class="page-indicator text-center mb-1">Page: 7 / 9</div>
     <div class="intro-center-frame">
       <div class="highlighted-lead">
         <div class="intro-title">Post-Discussion Questionnaire</div>

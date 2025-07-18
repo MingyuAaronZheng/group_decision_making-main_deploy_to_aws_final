@@ -11,7 +11,6 @@ import WaitingRoom from '../views/WaitingRoom.vue'
 import EarlyExit from '../views/errors/EarlyExit.vue'
 /** Errors **/
 import FailPairing from '../views/errors/FailPairing.vue'
-import FailAttention from '../views/errors/FailAttention.vue'
 /** Without AI **/
 
 import PreDSurvey from '@/views/PreDSurvey.vue'
@@ -64,11 +63,6 @@ const routes = [
     path: '/FailPairing',
     name: 'FailPairing',
     component: FailPairing
-  },
-  {
-    path: '/FailAttention',
-    name: 'FailAttention',
-    component: FailAttention
   },
   {
     path: '/GoBackTerminatedParticipation',
@@ -139,7 +133,7 @@ router.beforeEach((to, from, next) => {
   let toIndex
 
   // Define EndingPages as an array of pages that are not part of the study flow
-  const EndingPages = ['KickOut', 'FailPairing', 'FailAttention', 'NoEntrance', 'GoBackTerminatedParticipation', 'InactivityTerminatedParticipation', 'DeBriefing', 'EarlyExit']
+  const EndingPages = ['KickOut', 'FailPairing', 'NoEntrance', 'GoBackTerminatedParticipation', 'InactivityTerminatedParticipation', 'DeBriefing', 'EarlyExit']
   // If the page is an ending page, set the index to 1000
   if (EndingPages.includes(from.name)) {
     fromIndex = 1000

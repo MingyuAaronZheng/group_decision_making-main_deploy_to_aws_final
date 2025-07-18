@@ -459,4 +459,11 @@ export default {
   margin-top: 20px;
   text-align: center;
 }
+
+.page-indicator {
+  color: #6c757d;
+  font-size: 0.9em;
+  margin-top: 5px;
+  margin-bottom: 15px;
+}
 </style>

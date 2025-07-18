@@ -1,6 +1,6 @@
 <template>
   <div class="debriefing">
-    <div class="page-indicator text-center mb-1">Page: 10 / 10</div>
+    <div class="page-indicator text-center mb-1">Page: 9 / 9</div>
     <h1>Debriefing</h1>
     <p>Thank you for participating in the earlier group discussion. We understand that some topics may feel sensitive or polarizing.</p>
     <p>If you ever need support, please explore these mental health resources:</p>

@@ -1,6 +1,6 @@
 <template>
   <b-jumbotron header="Discussion Instructions" header-level="4" class="mb-4 fs-5">
-    <div class="content-area"><div class="page-indicator text-center mb-1">Page: 5 / 10</div></div>
+    <div class="content-area"><div class="page-indicator text-center mb-1">Page: 4 / 9</div></div>
     <div class="content-area bg-light p-4 rounded">
       <h5 class="mt-3 mb-2">What to Expect</h5>
       <p class="mb-3">

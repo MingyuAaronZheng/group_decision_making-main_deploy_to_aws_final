@@ -1,6 +1,6 @@
 <template>
   <b-jumbotron header-level="5" class="survey-container">
-    <div class="content-area"><div class="page-indicator text-center mb-1">Page: 4 / 10</div></div>
+    <div class="content-area"><div class="page-indicator text-center mb-1">Page: 3 / 9</div></div>
     <template v-slot:header>
       <h2 class="survey-title">Policy Statement Survey</h2>
     </template>

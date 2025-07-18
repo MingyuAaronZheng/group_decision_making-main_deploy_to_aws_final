@@ -20,6 +20,18 @@
             <b-form-input v-model="otherReason" placeholder="Your comments..."></b-form-input>
           </b-form-group>
         </b-form-group>
+
+        <div class="feedback-area">
+          <h5>Optional: Share any feedback about your experience (optional)</h5>
+          <b-form-textarea
+            v-model="feedback"
+            placeholder="Your feedback (optional)"
+            rows="4"
+            max-rows="8"
+            class="mb-3"
+          />
+        </div>
+
         <p>Your feedback is entirely optional and will remain confidential. Thank you for helping us improve!</p>
         <div class="button-area">
           <b-button variant="primary" name="next" @click="submit">Submit Feedback</b-button>
@@ -37,6 +49,7 @@ export default {
     return {
       reasons: [],
       otherReason: '',
+      feedback: '',
       isSubmitting: false
     }
   },
@@ -57,6 +70,19 @@ export default {
         terminateBody.append('subject_id', this.$store.state.subject_id)
         await axios.post(this.$server_url + 'terminate_participation', terminateBody)
 
+        // Submit the feedback
+        const feedbackBody = new FormData()
+        feedbackBody.append('subject_id', this.$store.state.subject_id)
+        // Combine structured reasons, other reason, and detailed feedback into feedback text
+        const feedbackText = `Early Exit Reasons: ${this.reasons.join(', ')}${this.otherReason ? '\nOther Reason: ' + this.otherReason : ''}${this.feedback ? '\n\nOptional Detailed Feedback:\n' + this.feedback : ''}`
+        feedbackBody.append('feedback_text', feedbackText)
+        try {
+          await axios.post(this.$server_url + 'submit_feedback', feedbackBody)
+        } catch (e) {
+          // Feedback is optional, so just log error
+          console.error('Feedback submission failed', e)
+        }
+
         // Then submit to Prolific
         const body = new FormData()
         body.append('subject_id', this.$store.state.subject_id)
@@ -67,13 +93,8 @@ export default {
         const response = await axios.post(this.$server_url + 'submit_to_prolific', body)
 
         if (response.data.success === true) {
-          // Use window.open to open in a new tab and prevent unload events
-          window.open(response.data.prolific_url, '_blank')
-          // Small delay to ensure the new tab opens before we potentially close this one
-          setTimeout(() => {
-            // This will close the tab if it was opened by JavaScript
-            window.close()
-          }, 1000)
+          // Redirect to Prolific URL in current tab
+          window.location.href = response.data.prolific_url
         } else {
           throw new Error('Failed to submit to Prolific')
         }
@@ -99,5 +120,8 @@ export default {
 .button-area {
   margin-top: 24px;
   text-align: center;
+}
+.feedback-area {
+  margin: 32px 0 16px 0;
 }
 </style>
