@@ -167,32 +167,7 @@
               />
             </div>
           </li>
-          <li>
-            Which of the following best describes your current immigration status?
-            <b-form-radio-group
-              v-model="immigrationStatus"
-              name="immigrationStatus"
-              buttons
-              button-variant="outline-black"
-              size="md"
-              class="agreement-options custom-radio-button"
-              @change="onFormInteraction"
-            >
-              <div class="agreement-wrapper">
-                <div v-for="option in immigration" :key="option.value" class="option-label-wrapper">
-                  <div class="option-label">{{ option.text }}</div>
-                  <b-form-radio :value="option.value" class="custom-radio-button" />
-                </div>
-              </div>
-            </b-form-radio-group>
-            <div v-if="immigrationStatus === '5'" class="mt-2">
-              <b-form-input
-                v-model="immigrationOther"
-                placeholder="Please specify your immigration status"
-                @input="onFormInteraction"
-              />
-            </div>
-          </li>
+
           <li>
             How often do you read or watch debates on social media (without posting arguments yourself)?
             <b-form-radio-group
@@ -342,13 +317,7 @@ export default {
         { text: 'Other (please specify)', value: '6' },
         { text: 'None', value: '7' }
       ],
-      immigration: [
-        { text: 'U.S. Citizen by birth', value: '1' },
-        { text: 'Naturalized U.S. Citizen', value: '2' },
-        { text: 'Permanent Resident (Green Card holder)', value: '3' },
-        { text: 'Temporary Visa holder (e.g., student, work)', value: '4' },
-        { text: 'Other (please specify)', value: '5' }
-      ],
+
       socialMediaRead: [
         { text: 'Never', value: '1' },
         { text: 'Rarely (less than once per month)', value: '2' },
@@ -388,8 +357,6 @@ export default {
       religionOther: '',
       politicalAffiliation: null,
       politicalOther: '',
-      immigrationStatus: null,
-      immigrationOther: '',
       socialMediaReadingFrequency: null,
       socialMediaPostingFrequency: null,
       socialMediaReadingPlatforms: [],
@@ -414,7 +381,6 @@ export default {
         (!this.ethnicitySelection || (this.ethnicitySelection === '7' && !this.ethnicityOther)) ||
         (!this.religionAffiliation || (this.religionAffiliation === '8' && !this.religionOther)) ||
         (!this.politicalAffiliation || (this.politicalAffiliation === '6' && !this.politicalOther)) ||
-        (!this.immigrationStatus || (this.immigrationStatus === '5' && !this.immigrationOther)) ||
         !this.socialMediaReadingFrequency ||
         !this.socialMediaPostingFrequency ||
         (this.showReadingPlatforms && this.socialMediaReadingPlatforms.length === 0) ||
@@ -454,7 +420,6 @@ export default {
       body.append('ethnicitySelection', this.ethnicitySelection === '7' ? this.ethnicityOther : this.ethnicitySelection)
       body.append('religionAffiliation', this.religionAffiliation === '8' ? this.religionOther : this.religionAffiliation)
       body.append('politicalAffiliation', this.politicalAffiliation === '6' ? this.politicalOther : this.politicalAffiliation)
-      body.append('immigrationStatus', this.immigrationStatus === '5' ? this.immigrationOther : this.immigrationStatus)
       body.append('socialMediaReadingFrequency', this.socialMediaReadingFrequency)
       body.append('socialMediaPostingFrequency', this.socialMediaPostingFrequency)
       body.append('socialMediaReadingPlatforms', JSON.stringify(this.socialMediaReadingPlatforms))
