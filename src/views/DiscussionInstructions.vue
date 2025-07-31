@@ -164,22 +164,55 @@ export default {
       this.isPlaying = false
     },
     async submitQuiz () {
+      if (!this.$store.state.subject_id) {
+        console.error('No subject ID found in store')
+        this.$alert('Session error: No subject ID found. Please refresh the page.', 'Error', { icon: 'error' })
+        return
+      }
+
+      if (!this.selectedAnswer) {
+        this.$alert('Please select an answer before submitting.', 'Error', { icon: 'warning' })
+        return
+      }
+
       try {
-        const response = await this.$axios.post('/api/submit_video_quiz/', {
+        const body = new FormData()
+        body.append('subject_id', this.$store.state.subject_id)
+        body.append('answer', this.selectedAnswer)
+
+        console.log('Submitting quiz with data:', {
           subject_id: this.$store.state.subject_id,
           answer: this.selectedAnswer
         })
 
+        const response = await this.$axios.post(this.$server_url + 'submit_video_quiz/', body)
+
+        console.log('Quiz submission response:', response)
+
         if (response.data.success) {
           this.quizSubmitted = true
           this.showQuiz = false
-          this.$alert('Thank you for your response. You can now proceed to the next page.', 'Quiz Completed', 'info')
+          this.$alert('Thank you for your response. You can now proceed to the next page.', 'Quiz Completed', { icon: 'success' })
         } else {
-          this.$alert('Failed to submit quiz. Please try again.', 'Error', 'error')
+          console.error('Quiz submission failed. Response:', response.data)
+          const errorMsg = response.data.error || response.data.message || 'Unknown error'
+          this.$alert(`Failed to submit quiz: ${errorMsg}`, 'Error', { icon: 'error' })
         }
       } catch (error) {
-        console.error('Error submitting quiz:', error)
-        this.$alert('Failed to submit quiz. Please try again.', 'Error', 'error')
+        console.error('Error submitting quiz. Full error:', error)
+        console.error('Error response data:', error.response?.data)
+        console.error('Error status:', error.response?.status)
+
+        let errorMsg = 'Network error'
+        if (error.response?.data?.error) {
+          errorMsg = error.response.data.error
+        } else if (error.response?.data?.message) {
+          errorMsg = error.response.data.message
+        } else if (error.message) {
+          errorMsg = error.message
+        }
+
+        this.$alert(`Failed to submit quiz: ${errorMsg}`, 'Error', { icon: 'error' })
       }
     }
   }
