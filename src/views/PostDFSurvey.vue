@@ -40,7 +40,7 @@
 
         <!-- Attention Check 1 -->
         <div class="section">
-          <p>What day of the week is tomorrow?</p>
+          <p>If July 2, 2025 is a Wednesday, what day of the week is July 7, 2025?</p>
           <b-form-radio-group v-model="attentionCheck1" :name="'attentionCheck1'" buttons button-variant="outline-black" size="md" class="agreement-options custom-radio-button" @change="onFormInteraction">
             <div class="agreement-wrapper">
               <div v-for="(option, optIndex) in attentionCheck1Options" :key="optIndex" class="option-label-wrapper">
@@ -115,10 +115,8 @@
 
         <!-- AI Interaction Quality (Conditional) -->
         <div v-if="hasAIParticipant || hasAIModerator" class="section">
+          <p class="instruction-text mb-4">Please indicate how much you agree or disagree with the following statements about your previous experience in the group discussion:</p>
           <div v-if="hasAIParticipant">
-            <div class="text-center">
-              <h4>Conversation Quality With the AI Participant</h4>
-            </div>
             <div v-for="(statement, index) in aiParticipantStatements" :key="index" class="mb-3">
               <p>{{ statement }}</p>
               <b-form-radio-group v-model="aiParticipantResponses[index]" :name="'aiParticipant_' + index" buttons button-variant="outline-black" size="md" class="agreement-options custom-radio-button" required @change="onFormInteraction">
@@ -133,9 +131,6 @@
           </div>
 
           <div v-if="hasAIModerator">
-            <div class="text-center">
-              <h4>Conversation Quality With the AI Moderator</h4>
-            </div>
             <div v-for="(statement, index) in aiModeratorStatements" :key="index" class="mb-3">
               <p>{{ statement }}</p>
               <b-form-radio-group v-model="aiModeratorResponses[index]" :name="'aiModerator_' + index" buttons button-variant="outline-black" size="md" class="agreement-options custom-radio-button" required @change="onFormInteraction">

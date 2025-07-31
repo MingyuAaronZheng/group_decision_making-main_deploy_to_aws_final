@@ -23,7 +23,7 @@
         <p class="entrance-section-title">
           The entire process is expected to take approximately <b>20 minutes</b>. Your responses will remain confidential and will be used exclusively for research purposes to ensure the integrity and impact of the findings.
           <br>
-          <span class="text-info entrance-section-subline">You may take part in this study only once.</span>
+          <span class="text-info entrance-section-subline">You are only allowed to participate in this study once.</span>
         </p>
         <b-alert variant="warning" show class="my-4 p-4 font-weight-bold entrance-alert d-flex align-items-center shadow-sm">
           <b-icon icon="info-circle-fill" font-scale="1.7" class="mr-3 text-info" />
