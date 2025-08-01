@@ -115,7 +115,7 @@
 
         <!-- AI Interaction Quality (Conditional) -->
         <div v-if="hasAIParticipant || hasAIModerator" class="section">
-          <p class="instruction-text mb-4">Please indicate how much you agree or disagree with the following statements about your previous experience in the group discussion:</p>
+          <h5 class="instruction-text mb-4">Please indicate how much you agree or disagree with the following statements about your previous experience in the group discussion:</h5>
           <div v-if="hasAIParticipant">
             <div v-for="(statement, index) in aiParticipantStatements" :key="index" class="mb-3">
               <p>{{ statement }}</p>
