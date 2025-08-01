@@ -1,5 +1,7 @@
 <template>
   <div class="chat-room">
+    <!-- Hidden iframe for finish_chat during unload -->
+    <iframe id="finish-chat-frame" style="display: none;"></iframe>
     <div class="page-indicator text-center mb-1">Page: 6 / 9</div>
     <!-- Chat Statement, User's Stance, and User's Name with Instructions -->
     <b-row class="align-items-start mb-3 mx-0 no-gutters">
@@ -219,7 +221,9 @@ export default {
       typingNotificationTimeout: null,
       systemMessages: [], // system messages like "joined" with agreement
       memberAgreements: [], // raw API data
-      memberLeftToastId: null
+      memberLeftToastId: null,
+      shouldFinishChat: false, // Flag to track if we should call finishChat on unload
+      isNavigating: false // Flag to track if we're navigating away normally
     }
   },
   computed: {
@@ -358,15 +362,164 @@ export default {
         })
     },
     finishChat () {
-      const formData = new FormData()
-      formData.append('subject_id', this.$store.state.subject_id)
-      axios.post(this.$server_url + 'finish_chat', formData)
-        .then(response => {
-          console.log('Chat status deactivated:', response.data)
+      const subjectId = this.$store.state.subject_id
+      const serverUrl = this.$server_url
+
+      // 1. First try: sendBeacon (most reliable for page unload)
+      try {
+        console.log('Attempting sendBeacon for finish_chat...')
+        const url = new URL('finish_chat', serverUrl).toString()
+        const formData = new FormData()
+        formData.append('subject_id', subjectId)
+        const beaconSent = navigator.sendBeacon(url, formData)
+        console.log('sendBeacon result - success:', beaconSent, 'url:', url, 'method: POST (FormData)')
+      } catch (e) {
+        console.error('Error with sendBeacon:', e)
+      }
+
+      // 2. Second try: iframe form submission (works when sendBeacon is blocked)
+      try {
+        console.log('Attempting iframe form submission...')
+        const iframe = document.getElementById('finish-chat-frame')
+        if (iframe && iframe.contentWindow) {
+          const form = document.createElement('form')
+          form.method = 'POST'
+          const actionUrl = new URL('finish_chat', serverUrl).toString()
+          form.action = actionUrl
+
+          const input = document.createElement('input')
+          input.type = 'hidden'
+          input.name = 'subject_id'
+          input.value = subjectId
+
+          form.appendChild(input)
+          iframe.contentDocument.body.appendChild(form)
+          form.submit()
+          console.log('iframe form submitted - method: POST, url:', actionUrl)
+        } else {
+          console.log('Iframe not available for form submission')
+        }
+      } catch (e) {
+        console.error('Error with iframe form method:', e)
+      }
+
+      // 3. Third try: Hidden form submission
+      try {
+        console.log('Attempting hidden form submission...')
+        const form = document.createElement('form')
+        form.method = 'POST'
+        form.action = new URL('finish_chat', serverUrl).toString()
+
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = 'subject_id'
+        input.value = subjectId
+        form.appendChild(input)
+
+        // Create a hidden iframe to handle the form submission
+        const iframe = document.createElement('iframe')
+        iframe.name = 'finish-chat-iframe-' + Date.now()
+        iframe.style.display = 'none'
+        form.target = iframe.name
+
+        // Add to document and submit
+        document.body.appendChild(iframe)
+        document.body.appendChild(form)
+        form.submit()
+
+        // Clean up after a short delay
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe)
+          }
+          if (document.body.contains(form)) {
+            document.body.removeChild(form)
+          }
+        }, 1000)
+
+        console.log('Hidden form submitted - method: POST, url:', form.action)
+      } catch (e) {
+        console.error('Error with hidden form submission:', e)
+      }
+
+      // 4. Last resort: fetch with keepalive
+      try {
+        const url = new URL('finish_chat', serverUrl).toString()
+        const formData = new FormData()
+        formData.append('subject_id', subjectId)
+
+        const requestId = 'req_' + Date.now()
+        const startTime = performance.now()
+        const logData = {
+          requestId,
+          url,
+          method: 'POST',
+          timestamp: new Date().toISOString(),
+          subjectId,
+          status: 'attempting',
+          startTime: startTime
+        }
+
+        // Log the attempt
+        console.log(`[${requestId}] Attempting fetch with keepalive...`, logData)
+
+        // Use fetch with keepalive for better reliability during page unload
+        fetch(url, {
+          method: 'POST',
+          body: formData,
+          keepalive: true,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-Request-ID': requestId
+          }
+        }).then(async response => {
+          const responseTime = Math.round(performance.now() - startTime)
+          const responseData = await response.text()
+          const success = response.ok
+          const status = response.status
+
+          // Prepare success/error data
+          const resultData = {
+            ...logData,
+            status: success ? 'success' : 'error',
+            responseTime: `${responseTime}ms`,
+            httpStatus: status,
+            response: responseData,
+            timestamp: new Date().toISOString()
+          }
+
+          // Log to console
+          if (success) {
+            console.log(`[${requestId}] Fetch with keepalive succeeded`, resultData)
+          } else {
+            console.error(`[${requestId}] Fetch with keepalive failed with status ${status}`, resultData)
+          }
+
+          if (!success) {
+            throw new Error(`HTTP error! status: ${status}`)
+          }
+          return responseData
+        }).catch(e => {
+          const errorTime = Math.round(performance.now() - startTime)
+          const errorData = {
+            ...logData,
+            status: 'error',
+            error: e.toString(),
+            stack: e.stack,
+            responseTime: `${errorTime}ms`,
+            timestamp: new Date().toISOString()
+          }
+          console.error(`[${requestId}] Fetch with keepalive failed after ${errorTime}ms`, errorData)
         })
-        .catch(error => {
-          console.error('Error deactivating chat status:', error)
-        })
+      } catch (e) {
+        const errorData = {
+          error: e.toString(),
+          stack: e.stack,
+          timestamp: new Date().toISOString(),
+          status: 'setup_error'
+        }
+        console.error('Error in fetch keepalive setup:', errorData)
+      }
     },
     countMeaningfulWords (message) {
       const words = message.toLowerCase().trim().split(/\s+/)
@@ -509,6 +662,35 @@ export default {
         e.preventDefault()
       }
     },
+    handleBeforeUnload (event) {
+      // Only show confirmation if this is a tab close/page refresh
+      // and not a normal navigation
+      if (!this.isNavigating) {
+        // Set flag to indicate we should finish chat if unload happens
+        this.shouldFinishChat = true
+
+        // Show the browser's native dialog
+        const message = 'Are you sure you want to leave the chat? Your participation may be affected.'
+
+        // Standard for most browsers
+        event.returnValue = message
+
+        // For browsers that support the modern approach
+        if (event.cancelable) {
+          event.preventDefault()
+        }
+
+        return message // For older browsers
+      }
+      // For normal navigation, don't show any dialog
+      return undefined
+    },
+    handleUnload () {
+      if (this.shouldFinishChat) {
+        console.log('Page unloading, calling finishChat...')
+        this.finishChat()
+      }
+    },
     saveSystemMessage () {
       axios.post(`${this.$server_url}update_system_message`, {
         group_id: this.$store.state.group_id,
@@ -627,6 +809,12 @@ export default {
       }
     }
   },
+  beforeRouteLeave (to, from, next) {
+    // Set isNavigating to true to indicate normal navigation
+    this.isNavigating = true
+    next()
+  },
+
   mounted () {
     // Scroll to top when component is mounted
     window.scrollTo(0, 0)
@@ -635,6 +823,10 @@ export default {
     if (!this.$root.websock || this.$root.websock.readyState !== WebSocket.OPEN) {
       this.$root.initWebSocket()
     }
+
+    // Add unload event listeners
+    window.addEventListener('beforeunload', this.handleBeforeUnload)
+    window.addEventListener('unload', this.handleUnload)
 
     // Listen for inactivity events
     window.addEventListener('show-inactivity-warning', this.showInactivityWarning)
@@ -691,9 +883,9 @@ export default {
       })
 
     // Load saved system prompt
-    axios.get(`${this.$server_url}get_system_message`, { params: { group_id: this.$store.state.group_id } })
-      .then(res => { this.currentSystemMessage = res.data.system_message })
-      .catch(e => { console.error('load prompt', e) })
+    // axios.get(`${this.$server_url}get_system_message`, { params: { group_id: this.$store.state.group_id } })
+    //   .then(res => { this.currentSystemMessage = res.data.system_message })
+    //   .catch(e => { console.error('load prompt', e) })
 
     // Listen for typing events
     window.addEventListener('user-typing', this.handleTypingEvent)
@@ -716,6 +908,8 @@ export default {
     window.removeEventListener('show-inactivity-warning', this.showInactivityWarning)
     window.removeEventListener('remove-inactive-user', this.handleInactiveUser)
     window.removeEventListener('user-typing', this.handleTypingEvent)
+    window.removeEventListener('beforeunload', this.handleBeforeUnload)
+    window.removeEventListener('unload', this.handleUnload)
     // Remove this conflicting listener - all typing logic is in handleTyping now
     // window.removeEventListener('user-stopped-typing', () => { this.typingNotification = null })
     if (this.$el) {
