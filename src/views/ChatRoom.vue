@@ -20,22 +20,22 @@
 
       <!-- Right Column: Special Instructions for Third Person -->
       <b-col v-if="$store.state.participant_condition === 3 && $store.state.is_third_person" md="5">
-        <div class="third-person-instructions p-3" style="background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #ffc107; height: 100%; font-size: 1.2rem;">
-          <h3 class="mb-3" style="font-size: 1.4rem;">Special Instructions for You</h3>
-          <div class="mb-3" style="font-size: 1.15rem;">We will bonus you if you do well in this task.</div>
+        <div class="third-person-instructions p-3" style="background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #ffc107; height: 100%; font-size: 1.1rem;">
+          <h3 class="mb-3" style="font-size: 1.3rem;">Special Instructions for You</h3>
+          <div class="mb-3" style="font-size: 1.1rem;">We will bonus you if you do well in this task.</div>
           <div v-if="$store.state.random_third_person_prompt === 0" class="advocating-prompt mt-2">
-            <h4 class="text-center p-2" style="background-color: #fff3cd; border-radius: 4px; display: inline-block; margin: 0 auto; display: block; width: fit-content; font-size: 1.4rem; margin-bottom: 0.8rem !important;">Advocating Role</h4>
-            <p style="font-size: 1.2rem; margin-bottom: 0.8rem;">Your specific task is to <strong style="background-color: #fff3cd; padding: 0 6px; border-radius: 3px; font-size: 1.25rem;">ALWAYS advocate</strong> your own position. Try to:</p>
-            <ul class="text-left pl-3" style="margin-bottom: 0; font-size: 1.15rem; padding-left: 1.5rem;">
+            <h4 class="text-center p-2" style="background-color: #fff3cd; border-radius: 4px; display: inline-block; margin: 0 auto; display: block; width: fit-content; font-size: 1.3rem; margin-bottom: 0.8rem !important;">Advocating Role</h4>
+            <p style="font-size: 1.1rem; margin-bottom: 0.8rem;">Your specific task is to <strong style="background-color: #fff3cd; padding: 0 6px; border-radius: 3px; font-size: 1.15rem;">ALWAYS advocate</strong> your own position. Try to:</p>
+            <ul class="text-left pl-3" style="margin-bottom: 0; font-size: 1.1rem; padding-left: 1.5rem;">
               <li><strong>Champion your stance:</strong> Consistently highlight its benefits, principles, and supporting evidence—use facts, logic, and real-world examples to build a clear, positive case.</li>
               <li><strong>Stay in your own lane:</strong> Do not mention, quote, or critique the opposing side's arguments, examples, or wording; keep every statement focused solely on strengthening your position.</li>
               <li><strong>Advance, don't rebut:</strong> When the other side speaks, ignore their points and offer fresh reasons or illustrations that reinforce your stance rather than responding to or comparing with theirs.</li>
             </ul>
           </div>
           <div v-else class="disputing-prompt mt-2">
-            <h4 class="text-center p-2" style="background-color: #fff3cd; border-radius: 4px; display: inline-block; margin: 0 auto; display: block; width: fit-content; font-size: 1.4rem; margin-bottom: 0.8rem !important;">Disputing Role</h4>
-            <p style="font-size: 1.2rem; margin-bottom: 0.8rem;">Your specific task is to <strong style="background-color: #fff3cd; padding: 0 6px; border-radius: 3px; font-size: 1.25rem;">ALWAYS dispute</strong> the position of others who hold opposite views to yours. Try to:</p>
-            <ul class="text-left pl-3" style="margin-bottom: 0; font-size: 1.15rem; padding-left: 1.5rem;">
+            <h4 class="text-center p-2" style="background-color: #fff3cd; border-radius: 4px; display: inline-block; margin: 0 auto; display: block; width: fit-content; font-size: 1.3rem; margin-bottom: 0.8rem !important;">Disputing Role</h4>
+            <p style="font-size: 1.1rem; margin-bottom: 0.8rem;">Your specific task is to <strong style="background-color: #fff3cd; padding: 0 6px; border-radius: 3px; font-size: 1.15rem;">ALWAYS dispute</strong> the position of others who hold opposite views to yours. Try to:</p>
+            <ul class="text-left pl-3" style="margin-bottom: 0; font-size: 1.1rem; padding-left: 1.5rem;">
               <li><strong>Zero-in on others' position:</strong> Use evidence, logic, and real-world examples to expose weaknesses, gaps, or harmful implications in the opponent's stance—every statement should chip away at their argument.</li>
               <li><strong>Don't bring up your own side:</strong> Do not mention or praise your own preferred view; avoid presenting its benefits, solutions, or supporting data—focus solely on why the opponent's idea falls short.</li>
               <li><strong>Counter, don't cultivate:</strong> When the other side speaks, reply with fresh critiques that undermine their point rather than offering alternative proposals or positive cases for any viewpoint.</li>
@@ -966,7 +966,7 @@ export default {
   margin: 0 0 30px 0;
   padding: 8px 0;
   color: #2c3e50;
-  font-size: 1.6em;
+  font-size: 1.4em;
   font-weight: 500;
 }
 
