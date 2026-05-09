@@ -54,7 +54,11 @@ ALLOWED_HOSTS = [
     'main.d1lwa086vbiduv.amplifyapp.com',
     'www.main.d1lwa086vbiduv.amplifyapp.com',
     'https://main.d1lwa086vbiduv.amplifyapp.com',
-    'www.main.d1lwa086vbiduv.amplifyapp.com'
+    'www.main.d1lwa086vbiduv.amplifyapp.com',
+    'main.d8zzmpev39qs6.amplifyapp.com',
+    'www.main.d8zzmpev39qs6.amplifyapp.com',
+    'https://main.d8zzmpev39qs6.amplifyapp.com',
+    'www.main.d8zzmpev39qs6.amplifyapp.com'
 ]
 
 
@@ -82,7 +86,29 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'server.middleware.xframe_options_middleware.XFrameOptionsMiddleware',  # Custom X-Frame-Options middleware
+]
+
+# CORS settings
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-request-id',
+    'x-request-id',
+    'x-requested-with',
+    'content-type',
+    'accept',
+    'origin',
+    'authorization',
+    'x-csrftoken'
 ]
 
 CORS_ORIGIN_WHITELIST = [
@@ -90,8 +116,39 @@ CORS_ORIGIN_WHITELIST = [
     'https://127.0.0.1:8080',
     'https://main.d93mhbbvrb5dl.amplifyapp.com',
     'https://main.d3lbr0m46vlu6t.amplifyapp.com',
-    'https://main.d1lwa086vbiduv.amplifyapp.com'
+    'https://main.d1lwa086vbiduv.amplifyapp.com',
+    'https://main.d8zzmpev39qs6.amplifyapp.com',
+    'http://localhost:8080',
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'https://gobackend.discussionexperiment.com'
 ]
+
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Add this to ensure preflight requests are handled properly
+CORS_PREFLIGHT_MAX_AGE = 86400
+CORS_EXPOSE_HEADERS = [
+    'x-request-id',
+    'x-requested-with',
+    'content-type',
+    'accept',
+    'origin',
+    'authorization',
+    'x-csrftoken'
+]
+
+# X-Frame-Options settings - handled by our custom middleware
+X_FRAME_OPTIONS = 'DENY'  # Default deny, overridden by our middleware
 
 ROOT_URLCONF = 'server.urls'
 

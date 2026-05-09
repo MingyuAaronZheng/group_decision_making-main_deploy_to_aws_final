@@ -29,7 +29,7 @@ urlpatterns = [
 
     # Legacy URLs that haven't been moved yet
     path('ccw/api/create_subject', views.create_subject),
-    path('ccw/api/update_demogra_survey', views.updateDemograSurvey),
+    path('ccw/api/update_normal_DemograSurvey', views.update_normal_DemograSurvey),
     path('ccw/api/Update_pre_discussion_survey', views.Update_pre_discussion_survey),
     path('ccw/api/update_chat_status', views.update_chat_status),
     path('ccw/api/post_do_survey', views.post_do_survey),

@@ -1,3 +1,4 @@
+# type: ignore
 from django.db import models
 from django.db.models import JSONField
 from datetime import datetime
@@ -15,12 +16,15 @@ class Subject(models.Model):
 	confirmed_instructions = models.BooleanField(default=False)  # Track if third person has confirmed instructions
 	random_third_person_prompt = models.IntegerField(default=-1)  # Track if third person has confirmed instructions
 	ready_to_pair = models.BooleanField(default=False)  # Track if subject is ready to be paired
-
+	finished_chat = models.BooleanField(default=False)  # Track if subject has finished chat
 	# Time stamps
 	start_time = models.DateTimeField(default = None, blank=True, null = True)
 	end_time = models.DateTimeField(default = None, blank=True, null = True)
 	pair_start_time = models.DateTimeField(default = None, blank=True, null = True)
 	pair_end_time = models.DateTimeField(default = None, blank=True, null = True)
+	chat_start_time = models.DateTimeField(default = None, blank=True, null = True)
+	chat_end_time = models.DateTimeField(default = None, blank=True, null = True)
+	finished_at = models.DateTimeField(default = None, blank=True, null = True)  # Track when subject finishes the study
 	'''
 	== moderator_condition Setting ==
 	0: No AI Moderator
@@ -50,6 +54,8 @@ class Subject(models.Model):
 	test_moderator_code = models.IntegerField(default = -1)
 	test_participant_code = models.IntegerField(default = -1)
 	test = models.CharField(max_length=1, default='N', null=True, blank=True)
+	# The 'auto_now_add=True' argument automatically sets the field to the current timestamp when the object is first created.
+	created_at = models.DateTimeField(auto_now_add=True)
 	def __str__(self):
 		return str(self._id)
 
@@ -73,6 +79,12 @@ class Group(models.Model):
 	'''
 	group_participant_condition = models.IntegerField(default = -1)
 	'''
+	== AI Participant Position Setting ==
+	0: Agree
+	1: Disagree
+	'''
+	AI_participant_position = models.IntegerField(default = -1)
+	'''
 	== moderator_condition Setting ==
 	0: No AI Moderator
 	1: AI Moderator
@@ -92,7 +104,9 @@ class Group(models.Model):
 	random_third_person_prompt = models.IntegerField(default=-1)
 	# User-customizable system prompt for GPT
 	moderator_custom_system_message = models.TextField(blank=True, default="")
-
+	# The 'auto_now_add=True' argument automatically sets the field to the current timestamp when the object is first created.
+	created_at = models.DateTimeField(auto_now_add=True)
+	
 	def __str__(self):
 		return str(self._id)
 
@@ -116,7 +130,7 @@ class MessageRecord(models.Model):
 	_id = models.AutoField(auto_created = True, primary_key = True)
 	subject_id = models.IntegerField(default = None, null = True)
 	group_id = models.IntegerField(default = None, null = True)
-	message = models.CharField(max_length= 2048, null = True)
+	message = models.TextField(null = True)
 	time_stamp = models.DateTimeField(auto_now_add=True, blank=True)
 	turn_number = models.IntegerField(default = 1)
 	# The auto_now_add parameter automatically sets the DateTimeField to the current date and time when the object is created.
@@ -147,6 +161,7 @@ class DemograSurvey(models.Model):
     ai_mental_capacity_responses = models.TextField()  # JSON data for AI mental capacity responses
     social_media_reading_platforms = models.JSONField(default=list)
     social_media_posting_platforms = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
     def __str__(self):
         return f"Survey ID: {self._id}, Subject ID: {self.subject_id}"
 
@@ -155,6 +170,7 @@ class PreDSurvey(models.Model):
 	subject_id = models.IntegerField(default = None)
 	responses = JSONField(default=list)
 	suggestions = models.TextField(default = '')
+	updated_at = models.DateTimeField(auto_now=True)
 
 	def __str__(self):
 		return str(self._id)
@@ -241,5 +257,79 @@ class EarlyExit(models.Model):
     status = models.CharField(max_length=20, default=None)
     early_exit_reasons = models.TextField(default='[]')
     early_exit_other = models.TextField(default='')
+    updated_at = models.DateTimeField(auto_now=True)
     def __str__(self):
         return str(self._id)
+
+class EndFeedback(models.Model):
+    _id = models.AutoField(auto_created=True, primary_key=True)
+    subject_id = models.IntegerField(default=None)
+    feedback_text = models.TextField(blank=True, null=True)
+    time_stamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback {self._id} - Subject {self.subject_id}"
+
+
+class AIDemograSurvey(models.Model):
+    _id = models.AutoField(auto_created=True, primary_key=True)
+    subject_id = models.IntegerField(default=None)
+    ai_tool_usage_frequency = models.CharField(max_length=1)  # Single-digit option (1-7)
+    ai_attitude_selection = models.CharField(max_length=1)  # Single-digit option (1-7)
+    ai_in_music = models.CharField(max_length=1)  # Single-digit option (1-4)
+    ai_in_email = models.CharField(max_length=1)  # Single-digit option (1-4)
+    ai_in_home_devices = models.CharField(max_length=1)  # Single-digit option (1-4)
+    ai_mental_capacity_responses = models.TextField()  # JSON array of 6 responses
+    time_stamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"AI Survey ID: {self._id}, Subject ID: {self.subject_id}"
+
+
+class Feedback(models.Model):
+    _id = models.AutoField(auto_created=True, primary_key=True)
+    subject_id = models.IntegerField(default=None)
+    feedback_text = models.TextField(blank=True, null=True)
+    time_stamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback {self._id} - Subject {self.subject_id}"
+
+class NormalDemographicSurveyResponse(models.Model):
+    _id = models.AutoField(auto_created=True, primary_key=True)
+    subject_id = models.IntegerField(default=None)
+    age_range = models.CharField(max_length=2)
+    gender_selection = models.CharField(max_length=2)
+    income_range = models.CharField(max_length=2)
+    education_level = models.CharField(max_length=2)
+    ethnicity_selection = models.CharField(max_length=255)  # Allow longer for "Other" responses
+    religion_affiliation = models.CharField(max_length=255)  # Allow longer for "Other" responses
+    political_affiliation = models.CharField(max_length=255)  # Allow longer for "Other" responses
+    immigration_status = models.CharField(max_length=255, null=True, blank=True)  # Allow longer for "Other" responses
+    social_media_reading_frequency = models.CharField(max_length=2)
+    social_media_posting_frequency = models.CharField(max_length=2)
+    social_media_reading_platforms = JSONField(default=list)
+    social_media_posting_platforms = JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Demographic Survey Response {self._id} - Subject {self.subject_id}"
+
+    class Meta:
+        db_table = 'demographic_survey_responses'
+        verbose_name = 'Demographic Survey Response'
+        verbose_name_plural = 'Demographic Survey Responses'
+
+class VideoQuizResponse(models.Model):
+    _id = models.AutoField(auto_created=True, primary_key=True)
+    subject_id = models.IntegerField(default=None)
+    answer = models.CharField(max_length=255)  # Store the selected answer
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Video Quiz Response {self._id} - Subject {self.subject_id}"
+
+    class Meta:
+        db_table = 'video_quiz_responses'
+        verbose_name = 'Video Quiz Response'
+        verbose_name_plural = 'Video Quiz Responses'

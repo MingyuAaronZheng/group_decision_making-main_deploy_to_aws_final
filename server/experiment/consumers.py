@@ -1,3 +1,4 @@
+# type: ignore
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from .models import Subject, Group, MessageRecord
@@ -276,9 +277,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             subject_id = data.get('subject_id')
 
             # Log typing event for debugging
-            print(f"Received typing event: {event_type} from subject {subject_id}")
+            # print(f"Received typing event: {event_type} from subject {subject_id}")
 
             if event_type == 'user_typing':
+                logger.info(f"Received typing event: {event_type} from subject {subject_id}, avatar_name: {data['avatar_name']}, avatar_color: {data['avatar_color']}")
                 response = {
                     "code": 203,  # Code for typing notification
                     "typing_info": {
@@ -303,7 +305,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
 
             # Log the response for debugging
-            print(f"Sending typing response: {response}")
+            # print(f"Sending typing response: {response}")
             return response
         elif code == 777: # GPT response
             subject_id = -1
@@ -386,16 +388,35 @@ class ChatConsumer(AsyncWebsocketConsumer):
             except Group.DoesNotExist:
                 return None
                 
-        elif code == 130:  # Leave room
+        elif code == 131:  # Inactivity termination
+            subject_id = data.get('subject_id')
+            group_id = data.get('group_id')
+            try:
+                # Create a mock request object to call terminate_participation
+                from django.http import HttpRequest
+                request = HttpRequest()
+                request.method = 'POST'
+                request.POST = {'subject_id': subject_id}
+
+                # Call terminate_participation function
+                from .views import terminate_participation
+                response = await database_sync_to_async(terminate_participation)(request)
+
+                # Return the response from terminate_participation
+                return response
+
+            except Exception as e:
+                logger.error(f"Error terminating subject {subject_id}: {str(e)}")
+                return {
+                    "code": 500,
+                    "error": f"Error terminating subject: {str(e)}"
+                }
+        elif code == 130:  # Leave room and DO NOTHING
             subject_id = data  # data contains the subject_id
             try:
-                # Update the subject's chatting status to False
-                subject = await database_sync_to_async(Subject.objects.get)(pk=subject_id)
-                subject.chatting = False
-                await database_sync_to_async(subject.save)()
-                logger.info(f"Subject {subject_id} left the chat room, set chatting=False")
+                logger.info(f"Subject {subject_id} left the chat room")
                 return {
-                    "code": 131,  # Success response code
+                    "code": 139,  # Success response code
                     "message": "Successfully left the chat room"
                 }
             except Subject.DoesNotExist:
