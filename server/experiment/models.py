@@ -133,6 +133,10 @@ class MessageRecord(models.Model):
 	message = models.TextField(null = True)
 	time_stamp = models.DateTimeField(auto_now_add=True, blank=True)
 	turn_number = models.IntegerField(default = 1)
+	is_valid = models.BooleanField(default=True)
+	validation_status = models.CharField(max_length=20, default='valid')
+	meaningful_word_count = models.IntegerField(default=None, null=True, blank=True)
+	validation_error = models.TextField(blank=True, default='')
 	# The auto_now_add parameter automatically sets the DateTimeField to the current date and time when the object is created.
 	# The blank parameter allows the field to be blank in the admin interface.
 

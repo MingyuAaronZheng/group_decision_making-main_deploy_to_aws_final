@@ -11,6 +11,7 @@ import os
 from django.http import HttpRequest
 from django.test import RequestFactory
 import logging
+from django.db import transaction
 
 TEST_MODE = True
 
@@ -88,25 +89,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
         Runs inside a thread. It's allowed to touch Django ORM directly.
         Return `response` dict (or None) that we'll broadcast later.
         """
-        group = Group.objects.get(pk=self.room_name)
-
-        if close_code == 4000:
-            group.is_activated = False
-
         if hasattr(ChatConsumer, "channel_map") \
            and self.channel_name in ChatConsumer.channel_map:
             subject_id = int(ChatConsumer.channel_map[self.channel_name])
 
-            if group.has_capacity:
-                group.activate_member_ids["subject_ids"].remove(subject_id)
-                group.member_ids["subject_ids"].remove(subject_id)
-                group.current_size -= 1
-                code = 931
-            else:
-                group.activate_member_ids["subject_ids"].remove(subject_id)
-                code = 901
-
-            group.save()
+            with transaction.atomic():
+                group = Group.objects.select_for_update().get(pk=self.room_name)
+                if close_code == 4000:
+                    group.is_activated = False
+                group.activate_member_ids["subject_ids"] = [
+                    int(id) for id in group.activate_member_ids.get("subject_ids", [])
+                    if int(id) != subject_id
+                ]
+                if group.has_capacity:
+                    group.member_ids["subject_ids"] = [
+                        int(id) for id in group.member_ids.get("subject_ids", [])
+                        if int(id) != subject_id
+                    ]
+                    group.current_size = max(0, group.current_size - 1)
+                    if group.current_size == 0:
+                        group.is_activated = False
+                        group.has_capacity = False
+                    Subject.objects.filter(pk=subject_id).update(group_id=-1, ready_to_pair=False, chatting=False)
+                    code = 931
+                else:
+                    Subject.objects.filter(pk=subject_id).update(chatting=False)
+                    Subject.objects.filter(_id__in=group.member_ids.get("subject_ids", [])).exclude(pk=subject_id).update(finished_chat=True)
+                    code = 901
+                group.save()
 
             return {
                 "code": code,
@@ -233,13 +243,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             except Group.DoesNotExist:
                 print(f"Group not found: {group_id}")
                 return {"code": 404, "error": f"Group {group_id} not found"}
-            # Create record and broadcast
-            # Only record human messages for turn tracking
-            body = {
-                    'subject_id': subject_id,
-                    'group_id': group_id,
-                    'message': msg
-                }
             await database_sync_to_async(group.refresh_from_db)()
             # Print sender avatar information
             subject = await database_sync_to_async(Subject.objects.get)(pk=subject_id)
@@ -250,27 +253,36 @@ class ChatConsumer(AsyncWebsocketConsumer):
             print(f"Message from: {subject.avatar_name} (Color: {subject.avatar_color})")
             print(f"group.current_turn: {group.current_turn}")
 
+            record_result = await database_sync_to_async(record_message)(
+                subject_id=subject_id,
+                group_id=group_id,
+                message=msg
+            )
+            if not record_result.get("success"):
+                return {
+                    "code": 422,
+                    "error": record_result.get("error", "message_rejected_validation"),
+                    "message": record_result.get("message", "Message rejected."),
+                    "message_record": record_result.get("message_record"),
+                    "meaningful_word_count": record_result.get("meaningful_word_count"),
+                    "required_meaningful_words": record_result.get("required_meaningful_words")
+                }
+
             response = {
                 "code": 201,
                 "message": {
+                    "id": record_result.get("message_record", {}).get("id"),
                     "sender": {
                         "subject_id": subject_id,
                         "avatar_name": subject.avatar_name,
                         "avatar_color": subject.avatar_color
                     },
-                    "content": msg
-                }
+                    "content": msg,
+                    "timestamp": record_result.get("message_record", {}).get("timestamp"),
+                    "turn_number": record_result.get("message_record", {}).get("turn_number")
+                },
+                "accepted": True
             }
-            import threading
-            try:
-                # Pass data directly to avoid request object issues
-                threading.Thread(target=record_message, kwargs={
-                    'subject_id': body['subject_id'],
-                    'group_id': body['group_id'],
-                    'message': body['message']
-                }).start()
-            except Exception as error:
-                print(f'Error recording message: {error}')
             return response
         elif code == 202:  # Typing events
             event_type = data.get('event')
@@ -314,7 +326,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             task_no = data['task_no']
             msg = data['msg']
 
-            message_record = await database_sync_to_async(MessageRecord.objects.create)(subject_id=subject_id, group_id=group_id, instance_id=instance_id, task_no=task_no, message=msg)
+            message_record = await database_sync_to_async(MessageRecord.objects.create)(subject_id=subject_id, group_id=group_id, message=msg, is_valid=True, validation_status='valid')
 
             response = {
                 "code": 778,
@@ -402,8 +414,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 from .views import terminate_participation
                 response = await database_sync_to_async(terminate_participation)(request)
 
-                # Return the response from terminate_participation
-                return response
+                return {
+                    "code": 132,
+                    "inactive_subject": subject_id,
+                    "message": "Due to inactivity, a group member has left the chat. Please proceed to the next survey when instructed."
+                }
 
             except Exception as e:
                 logger.error(f"Error terminating subject {subject_id}: {str(e)}")

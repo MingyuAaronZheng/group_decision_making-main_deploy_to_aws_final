@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
 import os
+from urllib.parse import urlparse
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -18,12 +19,18 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'dh$#1&6xsbpei#za+lko6pqq=hz@@p%-bo7w@be%v51db8ve!2'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = [
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'dev-only-insecure-secret-key'
+    else:
+        raise RuntimeError('DJANGO_SECRET_KEY must be set in production')
+
+DEFAULT_ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
     '172.31.12.2',
@@ -59,6 +66,11 @@ ALLOWED_HOSTS = [
     'www.main.d8zzmpev39qs6.amplifyapp.com',
     'https://main.d8zzmpev39qs6.amplifyapp.com',
     'www.main.d8zzmpev39qs6.amplifyapp.com'
+]
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', ','.join(DEFAULT_ALLOWED_HOSTS)).split(',')
+    if host.strip()
 ]
 
 
@@ -111,7 +123,7 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken'
 ]
 
-CORS_ORIGIN_WHITELIST = [
+DEFAULT_CORS_ORIGINS = [
     'http://127.0.0.1:8080',
     'https://127.0.0.1:8080',
     'https://main.d93mhbbvrb5dl.amplifyapp.com',
@@ -123,9 +135,16 @@ CORS_ORIGIN_WHITELIST = [
     'http://localhost:8000',
     'https://gobackend.discussionexperiment.com'
 ]
+CORS_ORIGIN_WHITELIST = [
+    origin.strip()
+    for origin in os.environ.get('DJANGO_CORS_ORIGINS', ','.join(DEFAULT_CORS_ORIGINS)).split(',')
+    if origin.strip()
+]
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('DJANGO_CORS_ALLOW_ALL_ORIGINS', 'False').lower() == 'true'
+if CORS_ALLOW_ALL_ORIGINS and not DEBUG:
+    raise RuntimeError('DJANGO_CORS_ALLOW_ALL_ORIGINS cannot be true in production')
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -172,17 +191,18 @@ WSGI_APPLICATION = 'server.wsgi.application'
 ASGI_APPLICATION = 'server.asgi.application'
 
 if 'REDIS_URL' in os.environ:
+    redis_url = os.environ['REDIS_URL']
+    parsed_redis = urlparse(redis_url)
+    redis_hosts = [redis_url] if parsed_redis.scheme else [(redis_url, int(os.environ.get('REDIS_PORT', 6379)))]
     CHANNEL_LAYERS = {
         'default' : {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                "hosts": [
-                    (os.environ["REDIS_URL"], 6379),
-                ],
+                "hosts": redis_hosts,
             }
         }
     }
-else:
+elif DEBUG and os.environ.get('DJANGO_ALLOW_LOCAL_REDIS', 'False').lower() == 'true':
     CHANNEL_LAYERS = {
         'default' : {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -192,6 +212,8 @@ else:
             },
         }
     }
+else:
+    raise RuntimeError('REDIS_URL must be set for the production channel layer')
 
 
 
@@ -208,17 +230,19 @@ if 'RDS_DB_NAME' in os.environ:
             'PORT': os.environ['RDS_PORT'],
         }
     }
-else:
+elif DEBUG and os.environ.get('DJANGO_ALLOW_LOCAL_DB', 'False').lower() == 'true':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': 'experimentai',
-            'USER': 'myz',
-            'PASSWORD': 'myzbest',
-            'HOST': 'localhost',
-            'PORT': '5432',
+            'NAME': os.environ.get('LOCAL_DB_NAME', 'experimentai'),
+            'USER': os.environ.get('LOCAL_DB_USER', 'postgres'),
+            'PASSWORD': os.environ.get('LOCAL_DB_PASSWORD', ''),
+            'HOST': os.environ.get('LOCAL_DB_HOST', 'localhost'),
+            'PORT': os.environ.get('LOCAL_DB_PORT', '5432'),
         }
     }
+else:
+    raise RuntimeError('RDS database environment variables must be set in production')
 
 
 # Sqlite database
@@ -262,7 +286,6 @@ USE_L10N = True
 
 USE_TZ = True
 
-CORS_ALLOW_ALL_ORIGINS = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.0/howto/static-files/

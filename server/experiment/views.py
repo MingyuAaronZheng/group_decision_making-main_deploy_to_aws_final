@@ -11,6 +11,7 @@ from django.utils import timezone  # type: ignore
 from datetime import datetime
 import random
 import json
+import re
 from .gpt import GPT
 from django.db import transaction  # type: ignore
 import logging
@@ -19,7 +20,7 @@ from channels.layers import get_channel_layer  # type: ignore
 from asgiref.sync import async_to_sync  # type: ignore
 import threading
 import os
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from .models import NormalDemographicSurveyResponse
 
 SUCCESS_CODE = "CHUZDXJH"
@@ -28,6 +29,61 @@ GO_BACK_TERMINATE_CODE = "C3AXEIWP"
 INACTIVE_TERMINATE_CODE = "C4ZJ8888"
 FAILED_PAIRING_CODE = "C5ZJ8888"
 EARLY_EXIT_CODE = "C6ZJ8888"
+AI_TURN_PENDING_SENTINEL = -9999
+
+FILLER_PHRASES = [
+    "you know",
+    "i mean",
+]
+FILLER_WORDS = {
+    "um", "uh", "er", "ah", "like", "okay", "right", "well", "so",
+    "anyway", "basically", "actually", "literally", "just",
+}
+
+
+def parse_json_field(value: Any, default: Any) -> Any:
+    """Return native JSON values whether DRF supplied a string or parsed object."""
+    if value is None or value == "":
+        return default
+    if isinstance(value, (list, dict)):
+        return value
+    if isinstance(value, str):
+        return json.loads(value)
+    return value
+
+
+def meaningful_word_count(message: str) -> int:
+    normalized = (message or "").lower()
+    normalized = re.sub(r"\b(can|won|don|isn|aren|wasn|weren|didn|doesn|couldn|shouldn|wouldn)'t\b", r"\1 not", normalized)
+    normalized = re.sub(r"\b(i|you|we|they|he|she|it)'(m|re|ve|ll|d|s)\b", r"\1 \2", normalized)
+    for phrase in FILLER_PHRASES:
+        normalized = re.sub(rf"\b{re.escape(phrase)}\b", " ", normalized)
+    tokens = re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)?", normalized)
+    meaningful_tokens = {token for token in tokens if token not in FILLER_WORDS}
+    return len(meaningful_tokens)
+
+
+def validate_human_message(message: str, test: str = "N") -> Dict[str, Any]:
+    count = meaningful_word_count(message)
+    required = 3 if test == "Y" else 10
+    accepted = count > required
+    return {
+        "accepted": accepted,
+        "meaningful_word_count": count,
+        "required_meaningful_words": required + 1,
+        "message": "Message accepted" if accepted else "Your message must contain more than 10 meaningful unique words. Filler words and repeated words do not count."
+    }
+
+
+def required_speaker_ids(group: Group) -> Set[int]:
+    required = {int(subject_id) for subject_id in group.member_ids.get("subject_ids", []) if int(subject_id) > 0}
+    if group.group_participant_condition == 1:
+        required.add(-3)
+    elif group.group_participant_condition == 2:
+        required.add(-4)
+    if group.group_moderator_condition == 1:
+        required.add(-2)
+    return required
 
 
 # Initialize logger
@@ -487,6 +543,13 @@ def pairing(request: HttpRequest) -> JsonResponse:
             group = Group.objects.get(pk=subject.group_id)
             group.refresh_from_db()
             logger.info("subject %s already in group %s", subject_id, group._id)
+            if group.has_capacity and group.current_size < group.size:
+                return JsonResponse({
+                    'success': False,
+                    'waiting_for_third_human': True,
+                    'group_id': group._id,
+                    'average_waiting_time': get_average_waiting_time()
+                })
             return JsonResponse({
                 'success': True,
                 'group_id': group._id,
@@ -497,8 +560,13 @@ def pairing(request: HttpRequest) -> JsonResponse:
         open_groups = Group.objects.filter(size=3, current_size=2, has_capacity=True)
 
         if open_groups:
-            group = open_groups[0]
             with transaction.atomic():
+                group = Group.objects.select_for_update().filter(size=3, current_size=2, has_capacity=True).first()
+                if group is None:
+                    return JsonResponse({'success': False, 'message': 'Open group was filled by another request', 'average_waiting_time': get_average_waiting_time()})
+                subject = Subject.objects.select_for_update().get(pk=subject_id)
+                if subject.group_id != -1:
+                    return JsonResponse({'success': False, 'message': 'Subject was assigned by another request', 'average_waiting_time': get_average_waiting_time()})
                 # Add subject to the existing group
                 group.member_ids['subject_ids'].append(subject._id)
                 group.current_size += 1
@@ -575,6 +643,10 @@ def pairing(request: HttpRequest) -> JsonResponse:
             logger.info('Test participant code: %s', participant_condition)
         # **Step 4: Create a New Group**
         with transaction.atomic():
+            subject = Subject.objects.select_for_update().get(pk=subject_id)
+            random_match_partner = Subject.objects.select_for_update().get(pk=random_match_partner._id)
+            if subject.group_id != -1 or random_match_partner.group_id != -1:
+                return JsonResponse({'success': False, 'message': 'Pairing state changed; retry', 'average_waiting_time': get_average_waiting_time()})
             group = Group.objects.create(
                 size=3 if participant_condition == 3 else 2,
                 group_chat_statement_index=chat_statement_idx,
@@ -749,9 +821,27 @@ def set_not_ready(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'success': False, 'message': 'Missing subject_id'}, status=400)
 
     try:
-        subject = Subject.objects.get(pk=subject_id)
-        subject.ready_to_pair = False
-        subject.save()
+        with transaction.atomic():
+            subject = Subject.objects.select_for_update().get(pk=subject_id)
+            subject.ready_to_pair = False
+            if subject.group_id != -1:
+                group = Group.objects.select_for_update().get(pk=subject.group_id)
+                if group.has_capacity and not subject.chatting:
+                    group.member_ids['subject_ids'] = [
+                        int(id) for id in group.member_ids.get('subject_ids', [])
+                        if int(id) != int(subject_id)
+                    ]
+                    group.activate_member_ids['subject_ids'] = [
+                        int(id) for id in group.activate_member_ids.get('subject_ids', [])
+                        if int(id) != int(subject_id)
+                    ]
+                    group.current_size = max(0, group.current_size - 1)
+                    if group.current_size == 0:
+                        group.has_capacity = False
+                        group.is_activated = False
+                    subject.group_id = -1
+                    group.save(update_fields=['member_ids', 'activate_member_ids', 'current_size', 'has_capacity', 'is_activated'])
+            subject.save()
         logger.info(f'Subject {subject_id} is not ready to pair')
         return JsonResponse({'success': True, 'message': 'Subject not ready to pair'})
     except Subject.DoesNotExist:
@@ -772,8 +862,8 @@ def get_different_opinions(subject: Subject, partner: Subject) -> List[int]:
         survey1 = PreDSurvey.objects.get(subject_id=subject._id)
         survey2 = PreDSurvey.objects.get(subject_id=partner._id)
 
-        responses1 = json.loads(survey1.responses)
-        responses2 = json.loads(survey2.responses)
+        responses1 = parse_json_field(survey1.responses, [])
+        responses2 = parse_json_field(survey2.responses, [])
         # Map statement_id to agreement for both participants
         resp_dict1 = {item['statement_id']: item['agreement'] for item in responses1}
         resp_dict2 = {item['statement_id']: item['agreement'] for item in responses2}
@@ -798,31 +888,30 @@ def get_statement_frequencies() -> Dict[int, int]:
         logger.info("No groups found with valid chat statement index")
         return {idx: 0 for idx in range(6)}
 
-    # Get counts for statements that have been discussed
     statement_counts = groups.values('group_chat_statement_index').annotate(count=Count('group_chat_statement_index'))
-    count_dict = {entry['group_chat_statement_index']: entry['count'] for entry in statement_counts}
+    count_dict = {idx: 0 for idx in range(6)}
+    count_dict.update({entry['group_chat_statement_index']: entry['count'] for entry in statement_counts})
 
     # Determine dynamic threshold
     min_count = min(count_dict.values())
     max_count = max(count_dict.values())
-    if min_count < 10 and max_count <= 10:
+    if min_count < 10:
         threshold = 10
         logger.info(f"Dynamic threshold set to {threshold} because min_count={min_count} and max_count={max_count}")
-    elif min_count >= 10 and min_count < 20 and max_count <= 20:  # Only increase threshold if all counts >= 10
+    elif min_count < 20:
         threshold = 20
         logger.info(f"Dynamic threshold set to {threshold} because min_count={min_count} and max_count={max_count}")
-    elif min_count >= 20 and min_count < 30 and max_count <= 30:  # Only increase threshold if all counts >= 20
+    elif min_count < 30:
         threshold = 30
         logger.info(f"Dynamic threshold set to {threshold} because min_count={min_count} and max_count={max_count}")
-    elif min_count >= 30 and min_count < 40 and max_count <= 40:  # Only increase threshold if all counts >= 30
+    elif min_count < 40:
         threshold = 40
         logger.info(f"Dynamic threshold set to {threshold} because min_count={min_count} and max_count={max_count}")
     else:
-        threshold = 40000
-        logger.info(f"Dynamic threshold set to {threshold} because min_count={min_count} and max_count={max_count}")
+        logger.info("All policies reached the V2 maximum threshold of 40; no policy is available without protocol revision")
+        return {}
 
-    # Include all statements from 0 to 5, defaulting to 0 for those not in count_dict
-    result = {idx: count_dict.get(idx, 0) for idx in range(6) if count_dict.get(idx, 0) < threshold}
+    result = {idx: count for idx, count in count_dict.items() if count < threshold}
     logger.info(f"Statement frequencies: {result}")
     return result
 
@@ -1062,7 +1151,21 @@ def get_system_message(request: HttpRequest) -> JsonResponse:
         logger.error("Group %s not found", group_id)
         return JsonResponse({'system_message': ''}, status=404)
 
-def record_message(subject_id: Optional[int] = None, group_id: Optional[int] = None, message: Optional[str] = None) -> Optional[JsonResponse]:
+def _broadcast_turn_update(group_id: int, current_turn: int) -> None:
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"chat_{group_id}",
+        {
+            "type": "chat_message",
+            "message": {
+                "code": 210,
+                "current_turn": current_turn
+            }
+        }
+    )
+
+
+def record_message(subject_id: Optional[int] = None, group_id: Optional[int] = None, message: Optional[str] = None) -> Dict[str, Any]:
     """
     Records a message from a subject
     Args:
@@ -1073,86 +1176,139 @@ def record_message(subject_id: Optional[int] = None, group_id: Optional[int] = N
     try:
         subject_id = int(subject_id)
         group_id = int(group_id)
-        # get the group and the current turn number
-        group = Group.objects.get(pk=group_id)
-        current_turn_str = str(group.current_turn)  # Convert to string for json dict key
-        logger.info("current turn is: %s", current_turn_str)
+        message = message or ""
+        should_generate_ai = False
+        current_turn_str = "1"
 
-        # Save message record with current turn number
-        MessageRecord.objects.create(
-            subject_id=subject_id,
-            group_id=group_id,
-            message=message,
-            turn_number=int(current_turn_str)
-        )
-        logger.info("message saved: %s for subject %s in turn %s", message, subject_id, current_turn_str)
-        # * track who sent message in current turn
-        # Initialize messages_turn for current turn if needed
-        if current_turn_str not in group.messages_turn:
-            group.messages_turn[current_turn_str] = []
-            logger.info("Initializing messages_turn for current turn: %s", current_turn_str)
-        # Add subject to current turn if they haven't sent a message yet
-        if subject_id not in group.messages_turn[current_turn_str]:
-            group.messages_turn[current_turn_str].append(subject_id)
-            group.save(update_fields=['messages_turn'])
-            logger.info("Adding subject %s to turn %s in message record", subject_id, current_turn_str)
-
-
-        # * Upadte turn number if all members have sent a message this turn and send turn end GPT response
-        # Check if all members have sent a message this turn
-        all_members = set(int(id) for id in group.member_ids['subject_ids'])
-        current_turn_members = set(int(id) for id in group.messages_turn[current_turn_str])
-        logger.info("all_members: %s", all_members)
-        logger.info("current_turn_members: %s", current_turn_members)
-        response_data = {'success': True, 'turn_increased': False}
-        # If all members have sent a message this turn, send turn end GPT response and increment turn counter
-        if all_members == current_turn_members:
-            send_turn_end_gpt_response(group_id, current_turn_str)
-            # Increment turn counter
-            group.current_turn += 1
-            group.save(update_fields=['current_turn'])
-            logger.info("Incrementing turn counter to %s", group.current_turn)
-            response_data['turn_increased'] = True
-            # Broadcast turn update via WebSocket
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f"chat_{group_id}",
-                {
-                    "type": "chat_message",
-                    "message": {
-                        "code": 210,
-                        "current_turn": group.current_turn
-                    }
+        with transaction.atomic():
+            group = Group.objects.select_for_update().get(pk=group_id)
+            subject = Subject.objects.select_for_update().get(pk=subject_id)
+            current_turn_str = str(group.current_turn)
+            validation = validate_human_message(message, subject.test or "N")
+            if not validation["accepted"]:
+                invalid_record = MessageRecord.objects.create(
+                    subject_id=subject_id,
+                    group_id=group_id,
+                    message=message,
+                    turn_number=int(current_turn_str),
+                    is_valid=False,
+                    validation_status='invalid',
+                    meaningful_word_count=validation["meaningful_word_count"],
+                    validation_error=validation["message"]
+                )
+                return {
+                    "success": False,
+                    "error": "message_rejected_validation",
+                    "message_record": {
+                        "id": invalid_record._id,
+                        "timestamp": invalid_record.time_stamp.isoformat(),
+                        "turn_number": invalid_record.turn_number
+                    },
+                    **validation
                 }
+            if not subject.active:
+                return {
+                    "success": False,
+                    "error": "inactive_terminate",
+                    "message": "Inactive participants cannot submit chat messages."
+                }
+
+            message_record = MessageRecord.objects.create(
+                subject_id=subject_id,
+                group_id=group_id,
+                message=message,
+                turn_number=int(current_turn_str),
+                is_valid=True,
+                validation_status='valid',
+                meaningful_word_count=validation["meaningful_word_count"]
             )
+            logger.info("message saved: %s for subject %s in turn %s", message, subject_id, current_turn_str)
+
+            if current_turn_str not in group.messages_turn:
+                group.messages_turn[current_turn_str] = []
+            if subject_id not in group.messages_turn[current_turn_str]:
+                group.messages_turn[current_turn_str].append(subject_id)
+
+            required = required_speaker_ids(group)
+            current_turn_members = {int(id) for id in group.messages_turn[current_turn_str]}
+            human_required = {id for id in required if id > 0}
+            ai_required = {id for id in required if id < 0}
+            should_generate_ai = human_required.issubset(current_turn_members) and (
+                not ai_required or AI_TURN_PENDING_SENTINEL not in current_turn_members
+            )
+            if should_generate_ai and ai_required:
+                group.messages_turn[current_turn_str].append(AI_TURN_PENDING_SENTINEL)
+            group.save(update_fields=['messages_turn'])
+
+        ai_speaker_ids: List[int] = []
+        if should_generate_ai:
+            ai_speaker_ids = send_turn_end_gpt_response(group_id, current_turn_str)
+
+        turn_increased = False
+        with transaction.atomic():
+            group = Group.objects.select_for_update().get(pk=group_id)
+            if str(group.current_turn) == current_turn_str:
+                if current_turn_str not in group.messages_turn:
+                    group.messages_turn[current_turn_str] = []
+                group.messages_turn[current_turn_str] = [
+                    int(id) for id in group.messages_turn[current_turn_str]
+                    if int(id) != AI_TURN_PENDING_SENTINEL
+                ]
+                for ai_id in ai_speaker_ids:
+                    if ai_id not in group.messages_turn[current_turn_str]:
+                        group.messages_turn[current_turn_str].append(ai_id)
+
+                required = required_speaker_ids(group)
+                current_turn_members = {int(id) for id in group.messages_turn[current_turn_str]}
+                if required.issubset(current_turn_members):
+                    group.current_turn += 1
+                    turn_increased = True
+                    logger.info("Incrementing turn counter to %s", group.current_turn)
+                group.save(update_fields=['messages_turn', 'current_turn'])
+                if turn_increased:
+                    _broadcast_turn_update(group_id, group.current_turn)
+
+        return {
+            "success": True,
+            "turn_increased": turn_increased,
+            "message_record": {
+                "id": message_record._id,
+                "timestamp": message_record.time_stamp.isoformat(),
+                "turn_number": message_record.turn_number
+            }
+        }
 
     except Exception as e:
         logger.info('Error details: %s', str(e))
         logger.info('Group ID: %s', group_id)
         logger.info('Subject ID: %s', subject_id)
         logger.info('Message: %s', message)
-        return JsonResponse({'error': str(e)}, status=500)
+        return {'success': False, 'error': 'server_unrecoverable_error', 'message': str(e)}
 
-def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> None:
+def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> List[int]:
     logger.info('Starting send_turn_end_gpt_response for group %s for turn %s', group_id, current_turn_str)
+    ai_speaker_ids: List[int] = []
     # get group
     group = Group.objects.get(pk=group_id)
 
     # Get timestamp of the first message in the current turn
     first_message_timestamp = MessageRecord.objects.filter(
         group_id=group_id,
-        turn_number=int(current_turn_str)
+        turn_number=int(current_turn_str),
+        is_valid=True
     ).values_list('time_stamp', flat=True).first()
     logger.info("first_message_timestamp in turn %s: %s", current_turn_str, first_message_timestamp)
     # Get messages from current turn
     current_message_records = MessageRecord.objects.filter(
         group_id=group_id,
-        time_stamp__gte=first_message_timestamp
+        time_stamp__gte=first_message_timestamp,
+        is_valid=True
     ).order_by('time_stamp')
     # Get messages from previous turns
     previous_message_records = MessageRecord.objects.filter(
         group_id=group_id,
-        time_stamp__lt=first_message_timestamp
+        time_stamp__lt=first_message_timestamp,
+        is_valid=True
     ).order_by('time_stamp')
 
     logger.info('Current messages in turn %s: %s', current_turn_str, current_message_records)
@@ -1207,7 +1363,9 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> None:
                     subject_id=participant_id,
                     group_id=group_id,
                     message=participant_gpt_response,
-                    turn_number=int(current_turn_str)
+                    turn_number=int(current_turn_str),
+                    is_valid=True,
+                    validation_status='valid'
                 )
                 logger.info("participant AI response saved: %s", participant_gpt_response)
                 # Broadcast participant AI response first
@@ -1254,6 +1412,7 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> None:
                 current_message_records.append(gpt_participant_message)
                 logger.info("adding gpt participant message")
                 logger.info("current_message_records: %s", current_message_records)
+                ai_speaker_ids.append(participant_id)
         # 2. Then get moderator response if condition requires it
         if group.group_moderator_condition == 1:
             logger.info("Getting moderator response")
@@ -1291,7 +1450,9 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> None:
                     subject_id=-2,  # Moderator ID
                     group_id=group_id,
                     message=moderator_response,
-                    turn_number=int(current_turn_str)
+                    turn_number=int(current_turn_str),
+                    is_valid=True,
+                    validation_status='valid'
                 )
                 logger.info("adding moderator response to MessageRecord")
                 moderator_response_response = json.loads(moderator_response)['response']
@@ -1330,11 +1491,13 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> None:
                             }
                         }
                     )
+                ai_speaker_ids.append(-2)
                 
 
     except Exception as e:
         logger.info(f"Error in send_turn_end_gpt_response: %s", str(e))
         # You might want to log this error or handle it in a specific way
+    return ai_speaker_ids
 
 
 def format_message_records(message_records: Any) -> List[Dict[str, Any]]:
@@ -1413,10 +1576,10 @@ def post_do_survey(request: HttpRequest) -> JsonResponse:
     response_data = {}
     data = request.data  # Using request.data since we're sending json, not form data
     subject_id = data.get('subject_id', None)
-    policy_responses = data.get('policy_responses', [])
+    policy_responses = parse_json_field(data.get('policy_responses', []), [])
     conversation_quality = data.get('conversation_quality', None)
-    conversation_responses = data.get('conversation_responses', [])
-    reciprocity_responses = data.get('reciprocity_responses', [])
+    conversation_responses = parse_json_field(data.get('conversation_responses', []), [])
+    reciprocity_responses = parse_json_field(data.get('reciprocity_responses', []), [])
 
     if subject_id is not None:
         try:
@@ -1479,19 +1642,19 @@ def post_df_survey(request: HttpRequest) -> JsonResponse:
             reflection=data.get('reflection'),
             attention_check_1=data.get('attention_check_1'),
             attention_check_2=data.get('attention_check_2'),
-            critical_thinking_responses=data.get('critical_thinking_responses', []),
+            critical_thinking_responses=parse_json_field(data.get('critical_thinking_responses', []), []),
             used_ai_tool=data.get('used_ai_tool'),
-            cost_responses=data.get('cost_responses', [])
+            cost_responses=parse_json_field(data.get('cost_responses', []), [])
         )
         logger.info("PostDFSurvey created for subject %s", subject_id)
 
         # Add AI-specific responses if applicable
         if group.group_participant_condition > 0:  # Has AI participant
-            survey.ai_participant_responses = data.get('ai_participant_responses', [])
+            survey.ai_participant_responses = parse_json_field(data.get('ai_participant_responses', []), [])
             logger.info("AI participant responses added for subject %s", subject_id)
 
         if group.group_moderator_condition == 1:  # Has AI moderator
-            survey.ai_moderator_responses = data.get('ai_moderator_responses', [])
+            survey.ai_moderator_responses = parse_json_field(data.get('ai_moderator_responses', []), [])
             logger.info("AI moderator responses added for subject %s", subject_id)
 
         survey.save()
@@ -1630,7 +1793,7 @@ def get_group_member_agreements(request: HttpRequest) -> JsonResponse:
             # Retrieve pre-discussion survey responses
             try:
                 survey = PreDSurvey.objects.get(subject_id=subject._id)
-                responses = json.loads(survey.responses)
+                responses = parse_json_field(survey.responses, [])
             except (PreDSurvey.DoesNotExist, ValueError, TypeError):
                 responses = []
             agreement = None
@@ -1690,15 +1853,29 @@ def terminate_participation(request: HttpRequest) -> JsonResponse:
     logging.info(f"[{request_id}] Processing termination for subject_id: {subject_id}")
 
     try:
-        subject = Subject.objects.get(pk=subject_id)
-        logging.info(f"[{request_id}] Found subject: {subject_id}, current active status: {subject.active}")
+        with transaction.atomic():
+            subject = Subject.objects.select_for_update().get(pk=subject_id)
+            logging.info(f"[{request_id}] Found subject: {subject_id}, current active status: {subject.active}")
 
-        if not subject.active:
-            logging.warning(f"[{request_id}] Subject {subject_id} was already inactive")
-            return JsonResponse({'success': True, 'message': 'Subject was already inactive'})
+            if not subject.active and subject.status == 'inactive_terminate':
+                logging.warning(f"[{request_id}] Subject {subject_id} was already inactive")
+                return JsonResponse({'success': True, 'message': 'Subject was already inactive'})
 
-        subject.active = False
-        subject.save(update_fields=['active'])
+            group_id = subject.group_id
+            subject.active = False
+            subject.chatting = False
+            subject.status = 'inactive_terminate'
+            subject.end_time = timezone.now()
+            subject.save(update_fields=['active', 'chatting', 'status', 'end_time'])
+
+            if group_id != -1:
+                group = Group.objects.select_for_update().filter(pk=group_id).first()
+                if group:
+                    group.activate_member_ids['subject_ids'] = [
+                        int(id) for id in group.activate_member_ids.get('subject_ids', [])
+                        if int(id) != int(subject_id)
+                    ]
+                    group.save(update_fields=['activate_member_ids'])
         logging.info(f"[{request_id}] Successfully deactivated subject {subject_id}")
 
         return JsonResponse({'success': True, 'request_id': request_id})
