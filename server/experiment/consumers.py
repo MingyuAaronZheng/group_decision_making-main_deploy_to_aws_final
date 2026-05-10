@@ -46,9 +46,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Add 'chat_' prefix to match the group_send in views.py
         self.chat_group_name = f"chat_{self.room_name}"
         # in consumers.py, inside connect()
-        logger.info(">>> CHANNEL LAYER CLASS:", self.channel_layer.__class__.__name__)
+        logger.info(">>> CHANNEL LAYER CLASS: %s", self.channel_layer.__class__.__name__)
         if 'REDIS_URL' in os.environ:
-            logger.info("REDIS_URL:", os.environ['REDIS_URL'])
+            logger.info("REDIS_URL: %s", os.environ['REDIS_URL'])
         else:
             logger.info("REDIS_URL not found in environment variables")
 

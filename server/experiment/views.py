@@ -9,6 +9,7 @@ from .models import (
 from django.db.models import Count  # type: ignore
 from django.utils import timezone  # type: ignore
 from datetime import datetime
+import asyncio
 import random
 import json
 import re
@@ -116,6 +117,42 @@ logger = logging.getLogger(__name__)
 logger.info('=' * 50)
 logger.info('Logging initialized')
 logger.info(f'Log file: {log_file_name}')
+
+
+def _send_chat_group_message(group_id: int, message: Dict[str, Any]) -> None:
+    """Send a chat websocket message from sync code in either sync or async test contexts."""
+    channel_layer = get_channel_layer()
+    group_name = f"chat_{group_id}"
+    payload = {
+        "type": "chat_message",
+        "message": message
+    }
+
+    def send_message() -> None:
+        async_to_sync(channel_layer.group_send)(group_name, payload)
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        send_message()
+        return
+
+    exception: List[BaseException] = []
+
+    def send_in_thread() -> None:
+        try:
+            send_message()
+        except BaseException as exc:
+            exception.append(exc)
+
+    thread = threading.Thread(target=send_in_thread, daemon=True)
+    thread.start()
+    thread.join(timeout=5)
+    if thread.is_alive():
+        raise TimeoutError(f"Timed out sending websocket message to {group_name}")
+    if exception:
+        raise exception[0]
+
 
 # Create your views here.
 def home_view(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
@@ -511,17 +548,10 @@ def process_inactive_members_in_group(group: Group) -> List[Subject]:
 def send_inactive_notification(group_id: int, subject_id: int) -> None:
     """Sends a WebSocket notification when a user is marked as inactive."""
     try:
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"chat_{group_id}",
-            {
-                "type": "chat_message",
-                "message": {
-                    "code": 132,  # Code for inactive user notification
-                    "message": "Due to certain reasons, a group member has left the chat. However, the study will continue. Please click the button to proceed to the next survey."
-                }
-            }
-        )
+        _send_chat_group_message(group_id, {
+            "code": 132,  # Code for inactive user notification
+            "message": "Due to certain reasons, a group member has left the chat. However, the study will continue. Please click the button to proceed to the next survey."
+        })
         logger.info(f"Sent inactive notification for subject {subject_id} in group {group_id}")
     except Exception as e:
         logger.error(f"Error sending inactive notification: {str(e)}")
@@ -1152,17 +1182,10 @@ def get_system_message(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'system_message': ''}, status=404)
 
 def _broadcast_turn_update(group_id: int, current_turn: int) -> None:
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"chat_{group_id}",
-        {
-            "type": "chat_message",
-            "message": {
-                "code": 210,
-                "current_turn": current_turn
-            }
-        }
-    )
+    _send_chat_group_message(group_id, {
+        "code": 210,
+        "current_turn": current_turn
+    })
 
 
 def record_message(subject_id: Optional[int] = None, group_id: Optional[int] = None, message: Optional[str] = None) -> Dict[str, Any]:
@@ -1313,9 +1336,6 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> List[int
 
     logger.info('Current messages in turn %s: %s', current_turn_str, current_message_records)
     logger.info('Previous messages in turn %s: %s', current_turn_str, previous_message_records)
-    from channels.layers import get_channel_layer
-    from asgiref.sync import async_to_sync
-    channel_layer = get_channel_layer()
     try:
         # 1. First get participant AI response if condition requires it
         if group.group_participant_condition in [1, 2]:
@@ -1329,21 +1349,15 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> List[int
                 ai_avatar = {'avatar_name': 'AI Participant', 'avatar_color': ''}
             
             logger.info(f"Sending typing notification for AI Participant (avatar: {ai_avatar}) in turn {current_turn_str}")
-            async_to_sync(channel_layer.group_send)(
-                f"chat_{group_id}",
-                {
-                    'type': 'chat_message',
-                    'message': {
-                        'code': 203,
-                        'typing_info': {
-                            'subject_id': participant_id,
-                            'avatar_name': ai_avatar['avatar_name']+ " (AI Participant)",
-                            'avatar_color': ai_avatar['avatar_color'] ,
-                            'is_typing': True
-                        }
-                    }
+            _send_chat_group_message(group_id, {
+                'code': 203,
+                'typing_info': {
+                    'subject_id': participant_id,
+                    'avatar_name': ai_avatar['avatar_name']+ " (AI Participant)",
+                    'avatar_color': ai_avatar['avatar_color'] ,
+                    'is_typing': True
                 }
-            )
+            })
             participant_gpt = GPT(
                 group_id=group_id,
                 moderator_condition=0,  # Set to 0 to get only participant response
@@ -1372,41 +1386,29 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> List[int
                 participant_gpt_response_response = json.loads(participant_gpt_response)['response']
                 logger.info("broadcasting participant response content %s", participant_gpt_response_response)
                 # Broadcast participant AI response with avatar info
-                async_to_sync(channel_layer.group_send)(
-                    f"chat_{group_id}",
-                    {
-                        'type': 'chat_message',
-                        'message': {
-                            "code": 201,
-                            "message": {
-                                "sender": {
-                                    "subject_id": participant_id,
-                                    "avatar_name": ai_avatar['avatar_name']+ " (AI Participant)",
-                                    "avatar_color": ai_avatar['avatar_color'] ,
-                                },
-                                "content": participant_gpt_response_response,
-                                "time_stamp": datetime.now().isoformat()
-                            }
-                        }
+                _send_chat_group_message(group_id, {
+                    "code": 201,
+                    "message": {
+                        "sender": {
+                            "subject_id": participant_id,
+                            "avatar_name": ai_avatar['avatar_name']+ " (AI Participant)",
+                            "avatar_color": ai_avatar['avatar_color'] ,
+                        },
+                        "content": participant_gpt_response_response,
+                        "time_stamp": datetime.now().isoformat()
                     }
-                )
+                })
                 
                 # Send typing notification: AI Participant stopped typing
-                async_to_sync(channel_layer.group_send)(
-                    f"chat_{group_id}",
-                    {
-                        "type": "chat_message",
-                        "message": {
-                            "code": 203,
-                            "typing_info": {
-                                "subject_id": participant_id,
-                                "avatar_name": ai_avatar['avatar_name']+ " (AI Participant)",
-                                "avatar_color": ai_avatar['avatar_color'] ,
-                                "is_typing": False
-                            }
-                        }
+                _send_chat_group_message(group_id, {
+                    "code": 203,
+                    "typing_info": {
+                        "subject_id": participant_id,
+                        "avatar_name": ai_avatar['avatar_name']+ " (AI Participant)",
+                        "avatar_color": ai_avatar['avatar_color'] ,
+                        "is_typing": False
                     }
-                )
+                })
                 # Add to current messages for moderator context
                 current_message_records = list(current_message_records)
                 current_message_records.append(gpt_participant_message)
@@ -1417,21 +1419,15 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> List[int
         if group.group_moderator_condition == 1:
             logger.info("Getting moderator response")
             # Send typing notification: AI Moderator started typing
-            async_to_sync(channel_layer.group_send)(
-                f"chat_{group_id}",
-                {
-                    'type': 'chat_message',
-                    'message': {
-                        'code': 203,
-                        'typing_info': {
-                            'subject_id': -2,
-                            'avatar_name': "AI Moderator ",
-                            'avatar_color': "",
-                            'is_typing': True
-                        }
-                    }
+            _send_chat_group_message(group_id, {
+                'code': 203,
+                'typing_info': {
+                    'subject_id': -2,
+                    'avatar_name': "AI Moderator ",
+                    'avatar_color': "",
+                    'is_typing': True
                 }
-            )
+            })
             moderator_gpt = GPT(
                 group_id=group_id,
                 moderator_condition=1,
@@ -1458,39 +1454,27 @@ def send_turn_end_gpt_response(group_id: int, current_turn_str: str) -> List[int
                 moderator_response_response = json.loads(moderator_response)['response']
                 logger.info("broadcasting moderator response content %s", moderator_response_response)
                 # Broadcast moderator response second
-                async_to_sync(channel_layer.group_send)(
-                    f"chat_{group_id}",
-                    {
-                        'type': 'chat_message',
-                        'message': {
-                            "code": 201,
-                            "message": {
-                                "sender": {
-                                    "subject_id": -2,
-                                    "avatar_name": "AI Moderator",
-                                    "avatar_color": "",
-                                },
-                                "content": moderator_response_response,
-                                "time_stamp": datetime.now().isoformat()
-                            }
-                        }
+                _send_chat_group_message(group_id, {
+                    "code": 201,
+                    "message": {
+                        "sender": {
+                            "subject_id": -2,
+                            "avatar_name": "AI Moderator",
+                            "avatar_color": "",
+                        },
+                        "content": moderator_response_response,
+                        "time_stamp": datetime.now().isoformat()
                     }
-                )
-                async_to_sync(channel_layer.group_send)(
-                        f"chat_{group_id}",
-                        {
-                            "type": "chat_message",
-                            "message": {
-                                "code": 203,
-                                "typing_info": {
-                                    "subject_id": -2,
-                                    "avatar_name": "AI Moderator",
-                                    "avatar_color": "",
-                                    "is_typing": False
-                                }
-                            }
-                        }
-                    )
+                })
+                _send_chat_group_message(group_id, {
+                    "code": 203,
+                    "typing_info": {
+                        "subject_id": -2,
+                        "avatar_name": "AI Moderator",
+                        "avatar_color": "",
+                        "is_typing": False
+                    }
+                })
                 ai_speaker_ids.append(-2)
                 
 
@@ -1713,17 +1697,10 @@ def confirm_instructions(request: HttpRequest) -> JsonResponse:
         logger.info("Confirmation time recorded for subject %s", subject_id)
 
         # Notify via WebSocket
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"chat_{group_id}",
-            {
-                "type": "chat_message",
-                "message": {
-                    "code": 300,
-                    "all_confirmed": all_confirmed
-                }
-            }
-        )
+        _send_chat_group_message(group_id, {
+            "code": 300,
+            "all_confirmed": all_confirmed
+        })
 
         return JsonResponse({
             'success': True,
