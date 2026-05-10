@@ -179,6 +179,12 @@ def create_subject(request: HttpRequest) -> JsonResponse:
         test_policy_number = request.POST.get('test_policy_number', None)
         test_turn_number = request.POST.get('test_turn_number', None)
     logger.info("worker_id: %s with study_id: %s and session_id: %s and test: %s", worker_id, study_id, session_id, test)
+    if not worker_id or not study_id or not session_id:
+        return JsonResponse({
+            "success": False,
+            "message": "Missing required Prolific identifiers",
+            "status": "invalid_prolific_identity"
+        }, status=400)
     if worker_id is not None:
         # This checks if there is NOT already a Subject in the database with the given worker_id, study_id, and session_id.
         # If such a Subject does not exist, the following block will execute to create a new Subject.
@@ -587,11 +593,32 @@ def pairing(request: HttpRequest) -> JsonResponse:
             })
 
         # **Step 1: Check if an existing 2-person group needs a third participant**
-        open_groups = Group.objects.filter(size=3, current_size=2, has_capacity=True)
+        open_groups = Group.objects.filter(
+            size=3,
+            current_size=2,
+            has_capacity=True,
+            group_participant_condition=3
+        )
+        if subject.test == 'Y':
+            open_groups = open_groups.filter(
+                group_moderator_condition=subject.test_moderator_code,
+                group_participant_condition=subject.test_participant_code
+            )
 
         if open_groups:
             with transaction.atomic():
-                group = Group.objects.select_for_update().filter(size=3, current_size=2, has_capacity=True).first()
+                locked_open_groups = Group.objects.select_for_update().filter(
+                    size=3,
+                    current_size=2,
+                    has_capacity=True,
+                    group_participant_condition=3
+                )
+                if subject.test == 'Y':
+                    locked_open_groups = locked_open_groups.filter(
+                        group_moderator_condition=subject.test_moderator_code,
+                        group_participant_condition=subject.test_participant_code
+                    )
+                group = locked_open_groups.first()
                 if group is None:
                     return JsonResponse({'success': False, 'message': 'Open group was filled by another request', 'average_waiting_time': get_average_waiting_time()})
                 subject = Subject.objects.select_for_update().get(pk=subject_id)
@@ -625,7 +652,16 @@ def pairing(request: HttpRequest) -> JsonResponse:
         # **Step 2: No 3-person group available, proceed with normal 2-person pairing**
         # Find all potential partners with opposing views on any statement
         potential_partners = []
-        for partner in Subject.objects.filter(group_id=-1, ready_to_pair=True).exclude(_id=subject._id):
+        partner_query = Subject.objects.filter(group_id=-1, ready_to_pair=True).exclude(_id=subject._id)
+        if subject.test == 'Y':
+            partner_query = partner_query.filter(
+                test='Y',
+                test_moderator_code=subject.test_moderator_code,
+                test_participant_code=subject.test_participant_code,
+                test_policy_number=subject.test_policy_number,
+                test_turn_number=subject.test_turn_number
+            )
+        for partner in partner_query:
             different_opinions_index = get_different_opinions(subject, partner)
             if different_opinions_index is not None:
                 potential_partners.append(partner)
@@ -1256,8 +1292,8 @@ def record_message(subject_id: Optional[int] = None, group_id: Optional[int] = N
             current_turn_members = {int(id) for id in group.messages_turn[current_turn_str]}
             human_required = {id for id in required if id > 0}
             ai_required = {id for id in required if id < 0}
-            should_generate_ai = human_required.issubset(current_turn_members) and (
-                not ai_required or AI_TURN_PENDING_SENTINEL not in current_turn_members
+            should_generate_ai = bool(ai_required) and human_required.issubset(current_turn_members) and (
+                AI_TURN_PENDING_SENTINEL not in current_turn_members
             )
             if should_generate_ai and ai_required:
                 group.messages_turn[current_turn_str].append(AI_TURN_PENDING_SENTINEL)
@@ -1268,6 +1304,7 @@ def record_message(subject_id: Optional[int] = None, group_id: Optional[int] = N
             ai_speaker_ids = send_turn_end_gpt_response(group_id, current_turn_str)
 
         turn_increased = False
+        new_turn = None
         with transaction.atomic():
             group = Group.objects.select_for_update().get(pk=group_id)
             if str(group.current_turn) == current_turn_str:
@@ -1286,14 +1323,17 @@ def record_message(subject_id: Optional[int] = None, group_id: Optional[int] = N
                 if required.issubset(current_turn_members):
                     group.current_turn += 1
                     turn_increased = True
+                    new_turn = group.current_turn
                     logger.info("Incrementing turn counter to %s", group.current_turn)
                 group.save(update_fields=['messages_turn', 'current_turn'])
-                if turn_increased:
-                    _broadcast_turn_update(group_id, group.current_turn)
+
+        if turn_increased and new_turn is not None:
+            _broadcast_turn_update(group_id, new_turn)
 
         return {
             "success": True,
             "turn_increased": turn_increased,
+            "new_turn": new_turn,
             "message_record": {
                 "id": message_record._id,
                 "timestamp": message_record.time_stamp.isoformat(),
@@ -1675,26 +1715,39 @@ def confirm_instructions(request: HttpRequest) -> JsonResponse:
     group_id = request.POST.get('group_id')
 
     try:
-        subject = Subject.objects.get(pk=subject_id)
+        with transaction.atomic():
+            group = Group.objects.select_for_update().get(pk=group_id)
+            subject = Subject.objects.select_for_update().get(pk=subject_id)
 
-        # Mark this subject as having confirmed instructions
-        subject.confirmed_instructions = True
-        subject.save()
-        logger.info("Subject %s marked as confirmed instructions", subject_id)
+            # Mark this subject as having confirmed instructions
+            subject.confirmed_instructions = True
+            subject.save(update_fields=['confirmed_instructions'])
+            logger.info("Subject %s marked as confirmed instructions", subject_id)
 
-        # Check if all third persons in the group have confirmed
-        third_persons = Subject.objects.filter(
-            group_id=group_id,
-            is_third_person=True
-        )
+            human_member_ids = [
+                int(member_id)
+                for member_id in group.member_ids.get('subject_ids', [])
+                if int(member_id) > 0
+            ]
+            if group.group_participant_condition == 3:
+                required_subject_ids = human_member_ids
+            else:
+                required_subject_ids = list(
+                    Subject.objects.filter(
+                        group_id=group_id,
+                        is_third_person=True
+                    ).values_list('_id', flat=True)
+                )
+            all_confirmed = not required_subject_ids or not Subject.objects.filter(
+                _id__in=required_subject_ids,
+                confirmed_instructions=False
+            ).exists()
 
-        all_confirmed = all(p.confirmed_instructions for p in third_persons)
-
-        # Record confirmation time
-        time_record = TimeRecord.objects.get(subject_id=subject_id)
-        time_record.confirm_instructions_time = timezone.now()
-        time_record.save()
-        logger.info("Confirmation time recorded for subject %s", subject_id)
+            # Record confirmation time
+            time_record = TimeRecord.objects.get(subject_id=subject_id)
+            time_record.confirm_instructions_time = timezone.now()
+            time_record.save(update_fields=['confirm_instructions_time'])
+            logger.info("Confirmation time recorded for subject %s", subject_id)
 
         # Notify via WebSocket
         _send_chat_group_message(group_id, {

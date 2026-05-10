@@ -14,6 +14,9 @@ from typing import Optional, Dict, Any
 
 from .models import Group, Subject, DemograSurvey, PreDSurvey
 
+OPENAI_CHAT_MODEL = "gpt-4o-2024-08-06"
+PROMPT_VERSION = "prd-dvtp-v1"
+
 # Demographic question/option mappings (from DemograSurvey.vue)
 DEMOGRA_QUESTION_MAP = {
     "age_range": {
@@ -1157,7 +1160,7 @@ class GPT:
                 
                 try:
                     gpt_response = client.beta.chat.completions.parse(
-                        model="gpt-4o-2024-08-06",
+                        model=OPENAI_CHAT_MODEL,
                         messages=messages,
                         response_format=DynamicResponseModel,
                         temperature=0.5
@@ -1174,9 +1177,35 @@ class GPT:
                 for field_name in DynamicResponseModel.__fields__.keys():
                     response_dict[field_name] = initial_response_text.get(field_name, '')
                 logging.info(f"Final response dict: {response_dict}")
+                GPTIntermediate.objects.create(
+                    group_id=self.group_id,
+                    turn_number=self.turn_number,
+                    model=OPENAI_CHAT_MODEL,
+                    prompt_version=PROMPT_VERSION,
+                    system_prompt=system_message,
+                    input_message_set={"messages": messages},
+                    raw_response=gpt_response.choices[0].message.content,
+                    parsed_response=response_dict,
+                    retry_count=0,
+                    error_metadata={},
+                    initial_response_text=json.dumps(initial_response_text),
+                    final_response=json.dumps(response_dict),
+                    gpt_id=self.gpt_id
+                )
                 return json.dumps(response_dict)
             except Exception as e:
                 logging.error(f"Error in get_response: {str(e)}")
+                GPTIntermediate.objects.create(
+                    group_id=self.group_id,
+                    turn_number=self.turn_number,
+                    model=OPENAI_CHAT_MODEL,
+                    prompt_version=PROMPT_VERSION,
+                    system_prompt=system_message,
+                    input_message_set={"messages": messages},
+                    retry_count=0,
+                    error_metadata={"error": str(e), "phase": "moderator_response"},
+                    gpt_id=self.gpt_id
+                )
                 raise
         if self.participant_condition in [1, 2]:
             messages: list[dict[str, str]] = []
@@ -1202,7 +1231,7 @@ class GPT:
                     start_time = time.time()
                     # Get initial GPT response using beta parser for Pydantic model
                     gpt_response = client.beta.chat.completions.parse(
-                        model="gpt-4o-2024-08-06",
+                        model=OPENAI_CHAT_MODEL,
                         messages=messages,
                         temperature=0.5,
                         response_format=plan_response
@@ -1210,7 +1239,8 @@ class GPT:
                     initial_response_time = time.time() - start_time
 
                     # The response is already parsed by the client
-                    initial_response_text = gpt_response.choices[0].message.content
+                    raw_initial_response_text = gpt_response.choices[0].message.content
+                    initial_response_text = raw_initial_response_text
                     if isinstance(initial_response_text, str):
                         initial_response_text = json.loads(initial_response_text)
                     logging.info(f"Initial response: {initial_response_text}")
@@ -1246,7 +1276,7 @@ class GPT:
                         start_time = time.time()
                         # Get validation response
                         validation_response = client.chat.completions.create(
-                            model="gpt-4o-2024-08-06",
+                            model=OPENAI_CHAT_MODEL,
                             messages=validation_messages,
                             temperature=0
                         )
@@ -1290,7 +1320,7 @@ class GPT:
                     logging.info(f"Merge messages: {merge_messages}")
                     start_time = time.time()
                     merge_response = client.chat.completions.create(
-                        model="gpt-4o-2024-08-06",
+                        model=OPENAI_CHAT_MODEL,
                         messages=merge_messages,
                         temperature=0.5
                     )
@@ -1318,7 +1348,18 @@ class GPT:
                 GPTIntermediate.objects.create(
                     group_id=self.group_id,
                     turn_number=self.turn_number,
-                    initial_response_text=initial_response_text,
+                    model=OPENAI_CHAT_MODEL,
+                    prompt_version=PROMPT_VERSION,
+                    system_prompt=system_message,
+                    input_message_set={"messages": messages},
+                    raw_response=json.dumps({
+                        "initial": raw_initial_response_text,
+                        "merge": merge_content,
+                    }),
+                    parsed_response={"plan": initial_response_text.get('plan', ''), "response": final_response},
+                    retry_count=attempt,
+                    error_metadata={},
+                    initial_response_text=json.dumps(initial_response_text),
                     processed_sub_sentences=processed_sub_sentences,
                     valid_sub_sentences=valid_sub_sentences,
                     final_response=final_response,
@@ -1335,6 +1376,17 @@ class GPT:
                 return json.dumps({'plan': initial_response_text['plan'], 'response': final_response})
             except Exception as e:
                 logging.error(f"Error getting GPT response: {str(e)}")
+                GPTIntermediate.objects.create(
+                    group_id=self.group_id,
+                    turn_number=self.turn_number,
+                    model=OPENAI_CHAT_MODEL,
+                    prompt_version=PROMPT_VERSION,
+                    system_prompt=system_message if 'system_message' in locals() else '',
+                    input_message_set={"messages": messages} if 'messages' in locals() else {},
+                    retry_count=attempt if 'attempt' in locals() else 0,
+                    error_metadata={"error": str(e), "phase": "participant_response"},
+                    gpt_id=self.gpt_id
+                )
                 return "..."
         else:
             return "No GPT for this condition"

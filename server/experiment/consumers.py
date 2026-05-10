@@ -27,6 +27,51 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def mark_ready_to_end(group_id, subject_id):
+    subject_id = int(subject_id)
+    group_id = int(group_id)
+    with transaction.atomic():
+        group = Group.objects.select_for_update().get(pk=group_id)
+        subject = Subject.objects.select_for_update().get(pk=subject_id)
+        member_ids = group.member_ids or {}
+        ready_members = []
+        for member_id in member_ids.get('ready_members', []):
+            member_id = int(member_id)
+            if member_id not in ready_members:
+                ready_members.append(member_id)
+        if subject_id not in ready_members:
+            ready_members.append(subject_id)
+        member_ids['ready_members'] = ready_members
+        group.member_ids = member_ids
+        group.save(update_fields=['member_ids'])
+
+        human_member_ids = [
+            int(member_id)
+            for member_id in member_ids.get('subject_ids', [])
+            if int(member_id) > 0
+        ]
+        active_human_ids = list(
+            Subject.objects.filter(
+                _id__in=human_member_ids,
+                active=True
+            ).values_list('_id', flat=True)
+        )
+        required_human_ids = active_human_ids or human_member_ids
+        all_ready = all(member_id in ready_members for member_id in required_human_ids)
+
+        return {
+            "code": 903,
+            "ready_members": ready_members,
+            "all_ready": all_ready,
+            "message": {
+                "sender": {
+                    "subject_id": subject_id,
+                    "avatar_name": subject.avatar_name,
+                    "avatar_color": subject.avatar_color
+                }
+            }
+        }
+
 class EchoConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
@@ -364,38 +409,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             group_id = data['group_id']
 
             try:
-                group = await database_sync_to_async(Group.objects.get)(pk=group_id)
-
-                # Mark the subject as ready
-                if 'ready_members' not in group.member_ids:
-                    group.member_ids['ready_members'] = []
-
-                if subject_id not in group.member_ids['ready_members']:
-                    group.member_ids['ready_members'].append(subject_id)
-                    await database_sync_to_async(group.save)()
-
-                # Fetch subject for avatar info
-                subject_obj = await database_sync_to_async(Subject.objects.get)(pk=subject_id)
-
-                # Check if all human members are ready
-                human_members = [id for id in group.member_ids['subject_ids'] if id > 0]
-                all_ready = all(id in group.member_ids['ready_members'] for id in human_members)
-
-                # Compose ready status response with avatar info
-                response = {
-                    "code": 903,  # Ready status update code
-                    "ready_members": group.member_ids['ready_members'],
-                    "all_ready": all_ready,
-                    "message": {
-                        "sender": {
-                            "subject_id": subject_id,
-                            "avatar_name": subject_obj.avatar_name,
-                            "avatar_color": subject_obj.avatar_color
-                        }
-                    }
-                }
-
-                return response
+                return await database_sync_to_async(mark_ready_to_end)(group_id, subject_id)
 
             except Group.DoesNotExist:
                 return None
