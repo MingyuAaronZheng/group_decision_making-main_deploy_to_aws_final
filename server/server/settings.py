@@ -130,10 +130,13 @@ DEFAULT_CORS_ORIGINS = [
     'https://main.d3lbr0m46vlu6t.amplifyapp.com',
     'https://main.d1lwa086vbiduv.amplifyapp.com',
     'https://main.d8zzmpev39qs6.amplifyapp.com',
+    'https://main.d3dls548hck5u8.amplifyapp.com',
     'http://localhost:8080',
     'http://localhost:3000',
     'http://localhost:8000',
-    'https://gobackend.discussionexperiment.com'
+    'https://gobackend.discussionexperiment.com',
+    'https://study.discussionexperiment.com',
+    'https://api-study.discussionexperiment.com'
 ]
 CORS_ORIGIN_WHITELIST = [
     origin.strip()

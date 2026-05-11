@@ -5,5 +5,9 @@ class XFrameOptionsMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
         # Allow embedding from the Amplify domains
-        response['X-Frame-Options'] = 'ALLOW-FROM https://main.d1lwa086vbiduv.amplifyapp.com https://main.d8zzmpev39qs6.amplifyapp.com'
+        response['X-Frame-Options'] = (
+            'ALLOW-FROM https://main.d1lwa086vbiduv.amplifyapp.com '
+            'https://main.d8zzmpev39qs6.amplifyapp.com '
+            'https://main.d3dls548hck5u8.amplifyapp.com'
+        )
         return response
